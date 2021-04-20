@@ -39,6 +39,8 @@ class MD17(flowws.Stage):
             help='Number of frames to take for training'),
         Arg('n_val', None, int, 1000,
             help='Number of frames to take for validation'),
+        Arg('n_test', None, int, 1000,
+            help='Number of frames to take for testing'),
         Arg('cache_dir', '-c', str, '/tmp/md17',
             help='Directory to store trajectory data'),
         Arg('molecules', '-m', [str], [],
@@ -66,6 +68,7 @@ class MD17(flowws.Stage):
         train_indices, val_indices, test_indices = {}, {}, {}
         N_train = self.arguments['n_train']
         N_val = self.arguments['n_val']
+        N_test = self.arguments['n_test']
 
         max_atoms = 0
         seen_types = set()
@@ -80,7 +83,7 @@ class MD17(flowws.Stage):
             np.random.shuffle(indices)
             train_indices[fname] = indices[:N_train]
             val_indices[fname] = indices[N_train:N_train + N_val]
-            test_indices[fname] = indices[N_train + N_val:]
+            test_indices[fname] = indices[N_train + N_val:N_train + N_val + N_test]
             seen_types.update(data['z'])
 
         all_types = [0] + list(sorted(seen_types))
