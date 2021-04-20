@@ -12,7 +12,7 @@ class ScaledMSE(keras.metrics.MeanSquaredError):
         super().__init__(*args, **kwargs)
 
     def result(self):
-        return super().result()*self.scale
+        return super().result()*self.scale**2
 
     def get_config(self):
         result = super().get_config()
