@@ -112,8 +112,11 @@ class NeighborhoodReduction(keras.layers.Layer):
         super().__init__(*args, **kwargs)
 
     def call(self, inputs, mask=None):
-        mask = tf.expand_dims(mask, -1)
-        result = tf.where(mask, inputs, tf.zeros_like(inputs))
+        result = inputs
+        if mask is not None:
+            mask = tf.expand_dims(mask, -1)
+            result = tf.where(mask, inputs, tf.zeros_like(inputs))
+
         if self.mode == 'sum':
             return tf.math.reduce_sum(result, axis=-2)
         elif self.mode == 'soft_max':
