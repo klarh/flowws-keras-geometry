@@ -47,6 +47,8 @@ class MD17(flowws.Stage):
             help='Random number seed to use'),
         Arg('units', None, str, 'meV',
             help='Energy units to use (meV or kcal/mol)'),
+        Arg('y_scale_reduction', None, float, 16,
+            help='Factor by which to scale forces for training purposes'),
     ]
 
     def run(self, scope, storage):
@@ -127,7 +129,7 @@ class MD17(flowws.Stage):
 
             datasets[name] = (dset_xs, dset_ts, dset_ys)
 
-        yscale = np.std(datasets['train'][-1])*16
+        yscale = np.std(datasets['train'][-1])*self.arguments['y_scale_reduction']
 
         for (_, _, y) in datasets.values():
             y /= yscale
