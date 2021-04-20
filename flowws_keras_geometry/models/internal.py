@@ -137,6 +137,9 @@ class PairwiseVectorDifference(keras.layers.Layer):
         return inputs[..., None, :] - inputs[..., None, :, :]
 
     def compute_mask(self, inputs, mask=None):
+        if mask is None:
+            return mask
+
         # (..., N, 3) -> (..., N)
         mask = tf.reduce_all(tf.not_equal(inputs, 0), axis=-1)
         # (..., N, N)
@@ -151,6 +154,9 @@ class PairwiseVectorDifferenceSum(keras.layers.Layer):
         ], axis=-1)
 
     def compute_mask(self, inputs, mask=None):
+        if mask is None:
+            return mask
+
         mask = tf.reduce_any(tf.not_equal(inputs, 0), axis=-1)
         mask = tf.logical_and(mask[..., None], mask[..., None, :])
         return mask
@@ -285,7 +291,7 @@ class VectorAttention(keras.layers.Layer):
             return result[0]
 
     def compute_mask(self, inputs, mask=None):
-        if not self.reduce:
+        if not self.reduce or mask is None:
             return mask
 
         (position_mask, value_mask) = mask
