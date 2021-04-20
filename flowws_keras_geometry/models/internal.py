@@ -166,7 +166,7 @@ class VectorAttention(keras.layers.Layer):
         self.rank = rank
 
         if merge_fun == 'mean':
-            self.merge_fun_ = lambda x, y: sum(args)/float(len(args))
+            self.merge_fun_ = lambda *args: sum(args)/float(len(args))
         elif merge_fun == 'concat':
             self.merge_fun_ = lambda *args: sum(tf.tensordot(x, b, 1) for (x, b) in zip(args, self.merge_kernels))
         else:
