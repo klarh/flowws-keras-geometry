@@ -47,7 +47,7 @@ def load_model(fname, path_substitutions):
         attention_model, (train_xs, train_ts), scope['validation_data'],
         batch_size, type_map)
 
-class AttentionViewer(flowws.Stage):
+class MoleculeAttentionViewer(flowws.Stage):
     ARGS = [
         Arg('filename', '-f', str,
             help='Saved model to open'),
