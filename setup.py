@@ -43,6 +43,12 @@ module_names = [
 ]
 add_subpkg(subpkg, module_names)
 
+subpkg = 'viz'
+module_names = [
+    'MoleculeAttentionViewer',
+]
+add_subpkg(subpkg, module_names)
+
 setup(name='flowws-keras-geometry',
       author='Matthew Spellings',
       author_email='mspells@vectorinstitute.ai',
