@@ -1,4 +1,5 @@
-from .internal import GradientLayer, NeighborhoodReduction, \
+from .internal import GradientLayer, MomentumNormalization, \
+    NeighborhoodReduction, \
     PairwiseValueNormalization, PairwiseVectorDifference, \
     PairwiseVectorDifferenceSum, VectorAttention
 
@@ -16,6 +17,7 @@ LAMBDA_ACTIVATIONS = {
 NORMALIZATION_LAYERS = {
     'layer': lambda _: keras.layers.LayerNormalization(),
     'layer_all': lambda rank: keras.layers.LayerNormalization(axis=[-i - 1 for i in range(rank + 1)]),
+    'momentum': lambda _: MomentumNormalization(),
     'pairwise': lambda _: PairwiseValueNormalization(),
 }
 
@@ -50,6 +52,8 @@ class MoleculeForceRegression(flowws.Stage):
         Arg('value_normalization', None, [str], [],
             help=('Normalizations to apply to value function' +
                   NORMALIZATION_LAYER_DOC)),
+        Arg('normalize_distances', None, str,
+            help='Method to use to normalize pairwise distances'),
     ]
 
     def run(self, scope, storage):
@@ -123,6 +127,14 @@ class MoleculeForceRegression(flowws.Stage):
 
         delta_x = PairwiseVectorDifference()(x_in)
         delta_v = PairwiseVectorDifferenceSum()(v_in)
+
+        if 'normalize_distances' in self.arguments:
+            mode = self.arguments['normalize_distances']
+
+            if mode == 'momentum':
+                delta_x = MomentumNormalization()(delta_x)
+            else:
+                raise NotImplementedError(mode)
 
         last = keras.layers.Dense(n_dim)(delta_v)
         for _ in range(self.arguments['n_blocks']):

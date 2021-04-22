@@ -105,6 +105,35 @@ class GradientLayer(keras.layers.Layer):
     def call(self, inputs):
         return tf.gradients(inputs[0], inputs[1])
 
+class MomentumNormalization(keras.layers.Layer):
+    def __init__(self, momentum=.99, epsilon=1e-7, *args, **kwargs):
+        self.momentum = momentum
+        self.epsilon = epsilon
+        super().__init__(*args, **kwargs)
+
+    def build(self, input_shape):
+        shape = [1]*len(input_shape)
+
+        self.mu = self.add_weight(
+            name='mu', shape=shape, initializer='zeros', trainable=False)
+        self.sigma = self.add_weight(
+            name='sigma', shape=shape, initializer='ones', trainable=False)
+
+    def call(self, inputs, training=False):
+        if training:
+            mean = tf.math.reduce_mean(inputs, keepdims=True)
+            std = tf.math.reduce_std(inputs, keepdims=True)
+            self.mu.assign(self.momentum*self.mu + (1 - self.momentum)*mean)
+            self.sigma.assign(self.momentum*self.sigma + (1 - self.momentum)*std)
+
+        return (inputs - self.mu)/(self.sigma + self.epsilon)
+
+    def get_config(self):
+        result = super().get_config()
+        result['momentum'] = self.momentum
+        result['epsilon'] = self.epsilon
+        return result
+
 class NeighborhoodReduction(keras.layers.Layer):
     def __init__(self, mode='sum', *args, **kwargs):
         self.mode = mode
