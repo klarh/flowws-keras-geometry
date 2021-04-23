@@ -111,14 +111,11 @@ class MoleculeForceRegression(flowws.Stage):
                 join_fun=self.arguments['join_fun'],
                 merge_fun=self.arguments['merge_fun'])([delta_x, last])
 
-            if self.arguments['residual'] and not self.arguments['block_nonlinearity']:
-                last = last + residual_in
-
             if self.arguments['block_nonlinearity']:
-                residual_in = last
                 last = make_valuefun()(last)
-                if self.arguments['residual']:
-                    last = last + residual_in
+
+            if self.arguments['residual']:
+                last = last + residual_in
 
             return last
 
