@@ -243,8 +243,8 @@ class VectorAttention(keras.layers.Layer):
     def _expand_products(self, rs, vs):
         broadcast_indices = []
         for i in range(1, self.rank + 1):
-            index = [Ellipsis] + [slice(None)]*(self.rank + 1)
-            index[-i - 1] = None
+            index = [Ellipsis] + [None]*(self.rank) + [slice(None)]
+            index[-i - 1] = slice(None)
             broadcast_indices.append(index)
 
         expanded_vs = [vs[index] for index in broadcast_indices]

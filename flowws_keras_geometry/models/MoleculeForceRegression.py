@@ -26,6 +26,8 @@ NORMALIZATION_LAYER_DOC = ' (any of {})'.format(','.join(NORMALIZATION_LAYERS))
 @flowws.add_stage_arguments
 class MoleculeForceRegression(flowws.Stage):
     ARGS = [
+        Arg('rank', None, int, 2,
+            help='Degree of correlations (n-vectors) to consider'),
         Arg('n_dim', '-n', int, 32,
             help='Working dimensionality of point representations'),
         Arg('dilation', None, float, 2,
@@ -57,7 +59,7 @@ class MoleculeForceRegression(flowws.Stage):
     ]
 
     def run(self, scope, storage):
-        rank = 2
+        rank = self.arguments['rank']
 
         if self.arguments['activation'] in LAMBDA_ACTIVATIONS:
             activation_layer = lambda: keras.layers.Lambda(
@@ -107,7 +109,7 @@ class MoleculeForceRegression(flowws.Stage):
         def make_block(last):
             residual_in = last
             last = VectorAttention(
-                make_scorefun(), make_valuefun(), False,
+                make_scorefun(), make_valuefun(), False, rank=rank,
                 join_fun=self.arguments['join_fun'],
                 merge_fun=self.arguments['merge_fun'])([delta_x, last])
 
@@ -139,6 +141,7 @@ class MoleculeForceRegression(flowws.Stage):
 
         (last, ivs, att) = VectorAttention(
             make_scorefun(), make_valuefun(), True, name='final_attention',
+            rank=rank,
             join_fun=self.arguments['join_fun'],
             merge_fun=self.arguments['merge_fun'])(
             [delta_x, last], return_invariants=True, return_attention=True)
