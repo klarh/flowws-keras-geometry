@@ -150,7 +150,10 @@ class MD17(flowws.Stage):
             if xscale <= 0:
                 delta = datasets['train'][0] - datasets['train'][0][:, :1]
                 delta = delta.reshape((-1, 3))
-                delta = np.linalg.norm(delta[np.any(delta != 0, axis=-1)], axis=-1)
+                filt = np.logical_and(
+                    np.any(datasets['train'][0].reshape((-1, 3)) != 0, axis=-1),
+                    np.any(delta != 0, axis=-1))
+                delta = np.linalg.norm(delta[filt], axis=-1)
                 xscale = np.std(delta)
 
             for (x, _, _) in datasets.values():
