@@ -51,6 +51,9 @@ class MD17(flowws.Stage):
             help='Energy units to use (meV or kcal/mol)'),
         Arg('y_scale_reduction', None, float, 16,
             help='Factor by which to scale forces for training purposes'),
+        Arg('x_scale_reduction', None, float,
+            help='Factor by which to scale input distances for training purposes'
+            ' (negative to auto-scale from training data)')
     ]
 
     def run(self, scope, storage):
@@ -140,6 +143,21 @@ class MD17(flowws.Stage):
         scaled_mse = ScaledMSE(yscale)
         scaled_mae = ScaledMAE(yscale)
 
+        xscale = 1.
+        if 'x_scale_reduction' in self.arguments:
+            xscale = self.arguments['x_scale_reduction']
+
+            if xscale <= 0:
+                delta = datasets['train'][0] - datasets['train'][0][:, :1]
+                delta = delta.reshape((-1, 3))
+                delta = np.linalg.norm(delta[np.any(delta != 0, axis=-1)], axis=-1)
+                xscale = np.std(delta)
+
+            for (x, _, _) in datasets.values():
+                x /= xscale
+
+        scope['y_scale'] = yscale
+        scope['x_scale'] = xscale
         scope['neighborhood_size'] = max_atoms
         scope['num_types'] = num_types
         scope['x_train'] = datasets['train'][:2]
