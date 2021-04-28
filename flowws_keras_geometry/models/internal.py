@@ -232,11 +232,12 @@ class VectorAttention(keras.layers.Layer):
 
         self.join_kernels = None
         if self.join_fun == 'concat':
-            stdev = tf.sqrt(2./self.rank/v_shape[-1])
+            # always joining neighborhood values and invariant values
+            stdev = tf.sqrt(2./2/v_shape[-1])
             self.join_kernels = [self.add_weight(
                 name='join_kernel_{}'.format(i), shape=(v_shape[-1], v_shape[-1]),
                 initializer=keras.initializers.RandomNormal(stddev=stdev)
-            ) for i in range(self.rank)]
+            ) for i in range(2)]
 
         return super().build(input_shape)
 
