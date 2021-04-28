@@ -35,7 +35,6 @@ def vecvec(a, b):
         [1, 0, 0, 0],
     ], dtype=products.dtype)
     return tf.tensordot(products, swizzle, 1)
-    return tf.linalg.matmul(products, swizzle, b_is_sparse=True)
 
 def vecvec_invariants(p):
     result = [p[..., :1], custom_norm(p[..., 1:4])]
@@ -66,7 +65,6 @@ def bivecvec(p, c):
         [0, 1, 0, 0],
     ], dtype=products.dtype)
     return tf.tensordot(products, swizzle, 1)
-    return tf.linalg.matmul(products, swizzle, b_is_sparse=True)
 
 def bivecvec_invariants(q):
     result = [custom_norm(q[..., :3]), q[..., 3:4]]
@@ -97,7 +95,6 @@ def trivecvec(q, d):
         [0, 1, 0, 0],
     ], dtype=products.dtype)
     return tf.tensordot(products, swizzle, 1)
-    return tf.linalg.matmul(products, swizzle, b_is_sparse=True)
 
 trivecvec_invariants = vecvec_invariants
 
