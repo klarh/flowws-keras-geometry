@@ -206,14 +206,16 @@ class VectorAttention(keras.layers.Layer):
         if merge_fun == 'mean':
             self.merge_fun_ = lambda *args: sum(args)/float(len(args))
         elif merge_fun == 'concat':
-            self.merge_fun_ = lambda *args: sum(tf.tensordot(x, b, 1) for (x, b) in zip(args, self.merge_kernels))
+            self.merge_fun_ = lambda *args: sum(
+                [tf.tensordot(x, b, 1) for (x, b) in zip(args, self.merge_kernels)])
         else:
             raise NotImplementedError()
 
         if join_fun == 'mean':
             self.join_fun_ = lambda *args: tf.reduce_mean(args, axis=0)
         elif join_fun == 'concat':
-            self.join_fun_ = lambda *args: sum(tf.tensordot(x, b, 1) for (x, b) in zip(args, self.join_kernels))
+            self.join_fun_ = lambda *args: sum(
+                [tf.tensordot(x, b, 1) for (x, b) in zip(args, self.join_kernels)])
         else:
             raise NotImplementedError()
 
@@ -258,7 +260,7 @@ class VectorAttention(keras.layers.Layer):
 
         left = expanded_rs[0]
 
-        invar_fn = lambda x: tf.linalg.norm(x, axis=-1, keepdims=True)
+        invar_fn = custom_norm
         for (product_fn, invar_fn, right) in zip(product_funs, invar_funs, expanded_rs[1:]):
             left = product_fn(left, right)
 
