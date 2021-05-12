@@ -14,6 +14,16 @@ def custom_norm(x):
 
     return y, grad
 
+def bivec_dual(b):
+    """scalar + bivector -> vector + trivector"""
+    swizzle = tf.constant([
+        [0, 0, 0, -1],
+        [0, 0, 1, 0],
+        [0, -1, 0, 0],
+        [1, 0, 0, 0]
+    ], dtype=b.dtype)
+    return tf.tensordot(b, swizzle, 1)
+
 def vecvec(a, b):
     """vector*vector -> scalar + bivector"""
     products = a[..., tf.newaxis]*b[..., tf.newaxis, :]
@@ -39,6 +49,10 @@ def vecvec(a, b):
 def vecvec_invariants(p):
     result = [p[..., :1], custom_norm(p[..., 1:4])]
     return tf.concat(result, axis=-1)
+
+def vecvec_covariants(p):
+    dual = bivec_dual(p)
+    return dual[..., :3]
 
 def bivecvec(p, c):
     """(scalar + bivector)*vector -> vector + trivector"""
@@ -70,6 +84,9 @@ def bivecvec_invariants(q):
     result = [custom_norm(q[..., :3]), q[..., 3:4]]
     return tf.concat(result, axis=-1)
 
+def bivecvec_covariants(q):
+    return q[..., :3]
+
 def trivecvec(q, d):
     """(vector + trivector)*vector -> scalar + bivector"""
     products = q[..., tf.newaxis]*d[..., tf.newaxis, :]
@@ -97,6 +114,8 @@ def trivecvec(q, d):
     return tf.tensordot(products, swizzle, 1)
 
 trivecvec_invariants = vecvec_invariants
+
+trivecvec_covariants = vecvec_covariants
 
 class GradientLayer(keras.layers.Layer):
     def call(self, inputs):
@@ -192,7 +211,8 @@ class PairwiseVectorDifferenceSum(keras.layers.Layer):
 
 class VectorAttention(keras.layers.Layer):
     def __init__(self, score_net, value_net, reduce=True,
-                 merge_fun='mean', join_fun='mean', rank=2, *args, **kwargs):
+                 merge_fun='mean', join_fun='mean', rank=2,
+                 *args, **kwargs):
         self.score_net = score_net
         self.value_net = value_net
         self.reduce = reduce
@@ -254,20 +274,26 @@ class VectorAttention(keras.layers.Layer):
             [vecvec], itertools.cycle([bivecvec, trivecvec]))
         invar_funs = itertools.chain(
             [vecvec_invariants], itertools.cycle([bivecvec_invariants, trivecvec_invariants]))
+        covar_funs = itertools.chain(
+            [vecvec_covariants], itertools.cycle([bivecvec_covariants, trivecvec_covariants]))
 
         left = expanded_rs[0]
 
         invar_fn = custom_norm
-        for (product_fn, invar_fn, right) in zip(product_funs, invar_funs, expanded_rs[1:]):
+        covar_fn = lambda x: x
+        for (product_fn, invar_fn, covar_fn, right) in zip(
+                product_funs, invar_funs, covar_funs, expanded_rs[1:]):
             left = product_fn(left, right)
 
-        result = invar_fn(left)
+        invar = invar_fn(left)
+        covar = covar_fn(left)
 
-        return broadcast_indices, result, expanded_vs
+        return broadcast_indices, invar, covar, expanded_vs
 
     def _intermediates(self, inputs, mask=None):
         (positions, values) = inputs
-        (broadcast_indices, invariants, expanded_values) = self._expand_products(positions, values)
+        (broadcast_indices, invariants, _, expanded_values) = \
+            self._expand_products(positions, values)
         neighborhood_values = self.merge_fun_(*expanded_values)
         invar_values = self.value_net(invariants)
 
@@ -299,15 +325,13 @@ class VectorAttention(keras.layers.Layer):
             dims = -self.rank
             reduce_axes = tuple(-i - 2 for i in range(self.rank - 1))
 
-        shape = tf.concat([old_shape[:dims], tf.math.reduce_prod(old_shape[dims:], keepdims=True)], -1)
+        shape = tf.concat([old_shape[:dims],
+                           tf.math.reduce_prod(old_shape[dims:], keepdims=True)], -1)
         scores = tf.reshape(scores, shape)
         attention = tf.reshape(tf.nn.softmax(scores), old_shape)
         output = tf.reduce_sum(attention*new_values, reduce_axes)
 
         return dict(attention=attention, output=output, invariants=invar_values)
-
-    def attention(self, inputs):
-        return self._intermediates(inputs)['attention']
 
     def call(self, inputs, return_invariants=False, return_attention=False, mask=None):
         intermediates = self._intermediates(inputs, mask)
