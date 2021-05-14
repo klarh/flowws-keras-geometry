@@ -34,6 +34,8 @@ for name in module_names:
 subpkg = 'data'
 module_names = [
     'MD17',
+    'PDBCache',
+    'PDBCoarseGrained',
     'PyriodicDataset',
 ]
 add_subpkg(subpkg, module_names)
@@ -42,6 +44,7 @@ subpkg = 'models'
 module_names = [
     'CrystalStructureClassification',
     'MoleculeForceRegression',
+    'PDBInverseCoarseGrain',
 ]
 add_subpkg(subpkg, module_names)
 

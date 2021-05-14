@@ -372,3 +372,62 @@ class VectorAttention(keras.layers.Layer):
         result['join_fun'] = self.join_fun
         result['rank'] = self.rank
         return result
+
+class Vector2VectorAttention(VectorAttention):
+    def __init__(self, score_net, value_net, scale_net, *args, **kwargs):
+        self.scale_net = scale_net
+        super().__init__(score_net, value_net, *args, **kwargs)
+
+    def _intermediates(self, inputs, mask=None):
+        (positions, values) = inputs
+        (broadcast_indices, invariants, covariants, expanded_values) = \
+            self._expand_products(positions, values)
+        neighborhood_values = self.merge_fun_(*expanded_values)
+        invar_values = self.value_net(invariants)
+
+        joined_values = self.join_fun_(invar_values, neighborhood_values)
+
+        scales = self.scale_net(joined_values)
+        scores = self.score_net(joined_values)
+        old_shape = tf.shape(scores)
+
+        if mask is not None:
+            (position_mask, value_mask) = mask
+            if position_mask is not None:
+                position_mask = tf.expand_dims(position_mask, -1)
+                position_mask = tf.reduce_all([position_mask[idx] for idx in broadcast_indices[:-1]], axis=0)
+            else:
+                position_mask = True
+            if value_mask is not None:
+                value_mask = tf.expand_dims(value_mask, -1)
+                value_mask = tf.reduce_all([value_mask[idx] for idx in broadcast_indices[:-1]], axis=0)
+            else:
+                value_mask = True
+            product_mask = tf.logical_and(position_mask, value_mask)
+            scores = tf.where(product_mask, scores, -HUGE_FLOAT)
+
+        if self.reduce:
+            dims = -(self.rank + 1)
+            reduce_axes = tuple(-i - 2 for i in range(self.rank))
+        else:
+            dims = -self.rank
+            reduce_axes = tuple(-i - 2 for i in range(self.rank - 1))
+
+        shape = tf.concat([old_shape[:dims], tf.math.reduce_prod(old_shape[dims:], keepdims=True)], -1)
+        scores = tf.reshape(scores, shape)
+        attention = tf.reshape(tf.nn.softmax(scores), old_shape)
+        output = tf.reduce_sum(attention*covariants*scales, reduce_axes)
+
+        return dict(attention=attention, output=output, invariants=invariants)
+
+    @classmethod
+    def from_config(cls, config):
+        new_config = dict(config)
+        for key in ('scale_net',):
+            new_config[key] = keras.models.Sequential.from_config(new_config[key])
+        return super(cls).from_config(new_config)
+
+    def get_config(self):
+        result = super().get_config()
+        result['scale_net'] = self.sccale_net.get_config()
+        return result
