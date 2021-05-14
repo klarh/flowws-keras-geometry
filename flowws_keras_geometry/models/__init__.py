@@ -1,1 +1,3 @@
+from .CrystalStructureClassification import CrystalStructureClassification
 from .MoleculeForceRegression import MoleculeForceRegression
+from .PDBInverseCoarseGrain import PDBInverseCoarseGrain
