@@ -229,7 +229,7 @@ class VectorAttention(keras.layers.Layer):
             raise NotImplementedError()
 
         if join_fun == 'mean':
-            self.join_fun_ = lambda *args: tf.reduce_mean(args, axis=0)
+            self.join_fun_ = lambda *args: sum(args)/float(len(args))
         elif join_fun == 'concat':
             self.join_fun_ = lambda *args: sum(
                 [tf.tensordot(x, b, 1) for (x, b) in zip(args, self.join_kernels)])
