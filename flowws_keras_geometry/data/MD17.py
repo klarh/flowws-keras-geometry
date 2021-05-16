@@ -141,6 +141,8 @@ class MD17(flowws.Stage):
         scope['num_types'] = num_types
         scope['x_train'] = datasets['train'][:2]
         scope['y_train'] = datasets['train'][-1]
+        scope['x_test'] = datasets['test'][:2]
+        scope['y_test'] = datasets['test'][-1]
         scope['validation_data'] = (datasets['val'][:2], datasets['val'][-1])
         scope['type_map'] = type_map
         scope.setdefault('metrics', []).extend([scaled_mse, scaled_mae])
