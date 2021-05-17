@@ -7,11 +7,7 @@ from tensorflow import keras
 from .internal import HUGE_FLOAT, PairwiseVectorDifference, \
     PairwiseVectorDifferenceSum, VectorAttention, Vector2VectorAttention
 
-class CoarseGrainAttention(VectorAttention):
-    def __init__(self, score_net, value_net, scale_net, *args, **kwargs):
-        self.scale_net = scale_net
-        super().__init__(score_net, value_net, *args, **kwargs)
-
+class CoarseGrainAttention(Vector2VectorAttention):
     def build(self, input_shape):
         v_shape = input_shape[1]
         result = super().build(input_shape[:-1])

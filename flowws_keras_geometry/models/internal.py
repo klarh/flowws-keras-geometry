@@ -425,7 +425,7 @@ class Vector2VectorAttention(VectorAttention):
         new_config = dict(config)
         for key in ('scale_net',):
             new_config[key] = keras.models.Sequential.from_config(new_config[key])
-        return super(cls).from_config(new_config)
+        return super(Vector2VectorAttention, cls).from_config(new_config)
 
     def get_config(self):
         result = super().get_config()
