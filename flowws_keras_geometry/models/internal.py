@@ -429,5 +429,5 @@ class Vector2VectorAttention(VectorAttention):
 
     def get_config(self):
         result = super().get_config()
-        result['scale_net'] = self.sccale_net.get_config()
+        result['scale_net'] = self.scale_net.get_config()
         return result
