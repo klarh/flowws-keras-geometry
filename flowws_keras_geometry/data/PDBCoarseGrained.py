@@ -40,15 +40,22 @@ def coarse_grain(record, num_neighbors=4, x_scale=1.):
         box, nlist, positions, types, record.residue_type_names,
         child_positions, child_types, record.type_names)
 
-def loop_neighborhood_environments(rec, neighborhood_size):
+def loop_neighborhood_environments(
+        rec, neighborhood_size, seed=13, fraction_range=(0, 2.)):
+
+    rand = np.random.default_rng(seed)
     index_i = rec.nlist.query_point_indices
     index_j = rec.nlist.point_indices
 
     shuffle_indices = np.arange(len(rec.positions))
+    fraction_assignments = rand.random(len(rec.positions))
     while True:
-        np.random.shuffle(shuffle_indices)
+        rand.shuffle(shuffle_indices)
 
         for i in shuffle_indices:
+            if not (fraction_range[0] <= fraction_assignments[i] < fraction_range[1]):
+                continue
+
             bond_start = rec.nlist.find_first_index(i)
             bond_stop = rec.nlist.find_first_index(i + 1)
             bonds = slice(bond_start, bond_stop)
@@ -63,28 +70,29 @@ def loop_neighborhood_environments(rec, neighborhood_size):
 
             yield rij, types_i, types_j, rchildren, tchildren
 
-def randomly_loop_iter(xs):
+def randomly_loop_iter(xs, seed):
+    rand = random.Random(seed)
     xs = list(xs)
     while True:
-        random.shuffle(xs)
+        rand.shuffle(xs)
         yield from xs
 
 def make_batches(cg_records, batch_size, neighborhood_size,
-                 max_atoms, max_types, global_type_remaps, y_scale=1.):
-    name_iter = randomly_loop_iter(sorted(cg_records))
+                 max_atoms, max_types, global_type_remaps, y_scale=1.,
+                 fraction_range=(0, 2.), seed=13):
+    rand = random.Random(seed)
+    name_iter = randomly_loop_iter(sorted(cg_records), rand.randint(0, 2**32))
+
+    iterators = {}
+    for (name, rec) in sorted(cg_records.items()):
+        iterators[name] = loop_neighborhood_environments(
+            rec, neighborhood_size, rand.randint(0, 2**32), fraction_range)
 
     while True:
         cg_rij = np.zeros((batch_size, neighborhood_size, 3), dtype=np.float32)
         cg_tij = np.zeros((batch_size, neighborhood_size, 2*max_types), dtype=np.float32)
         fg_tchild = np.zeros((batch_size, max_atoms), dtype=np.uint32)
         fg_rchild = np.zeros((batch_size, max_atoms, 3), dtype=np.float32)
-
-        iterators = {name: loop_neighborhood_environments(rec, neighborhood_size)
-                    for (name, rec) in sorted(cg_records.items())}
-        cg_rij[:] = 0
-        cg_tij[:] = 0
-        fg_tchild[:] = 0
-        fg_rchild[:] = 0
 
         for batch_i in range(batch_size):
             name = next(name_iter)
@@ -123,8 +131,6 @@ class PDBCoarseGrained(flowws.Stage):
     ]
 
     def run(self, scope, storage):
-        random.seed(self.arguments['seed'])
-        np.random.seed(random.randint(0, 2**32 - 1))
 
         all_records = scope['pdb_records']
         coarse_records = {}
@@ -162,42 +168,36 @@ class PDBCoarseGrained(flowws.Stage):
             global_type_remaps[name] = (
                 np.array(res_type_remap, dtype=np.uint32), np.array(atom_type_remap, dtype=np.uint32))
 
-        all_ids = list(sorted(coarse_records))
-        random.shuffle(all_ids)
-        N = int(self.arguments['validation_fraction']*len(all_ids))
-        if N:
-            train_ids, val_ids = all_ids[N:], all_ids[:N]
-        else:
-            train_ids, val_ids = all_ids, []
-
-        if 'test_fraction' in self.arguments:
-            N = int(self.arguments['validation_fraction']*len(all_ids))
-            train_ids, test_ids = train_ids[N:], train_ids[:N]
-        else:
-            test_ids = []
-
-        train_records = {k: coarse_records[k] for k in train_ids}
-        val_records = {k: coarse_records[k] for k in val_ids}
-        test_records = {k: coarse_records[k] for k in test_ids}
-
         print('Max number of atoms in a residue:', max_atoms)
 
         scaled_mse = ScaledMSE(self.arguments['y_scale'])
         scaled_mae = ScaledMAE(self.arguments['y_scale'])
         y_scale = self.arguments['y_scale']/self.arguments['x_scale']
 
-        scope['train_generator'] = make_batches(
-            train_records, self.arguments['batch_size'], self.arguments['neighborhood_size'],
-            max_atoms, len(all_residue_types), global_type_remaps, y_scale)
-        if val_records:
-            scope['validation_generator'] = make_batches(
-                val_records, self.arguments['batch_size'], self.arguments['neighborhood_size'],
-                max_atoms, len(all_residue_types), global_type_remaps, y_scale)
-        else:
+        ranges, labels = [0], []
+        if self.arguments['validation_fraction']:
+            ranges.append(self.arguments['validation_fraction'])
+            labels.append('validation')
+
+        if 'test_fraction' in self.arguments:
+            ranges.append(self.arguments['test_fraction'])
+            labels.append('test')
+
+        ranges.append(2.)
+        labels.append('train')
+
+        cumulative_ranges = np.cumsum(ranges)
+        label_ranges = {name: (start, stop) for (name, start, stop)
+                        in zip(labels, cumulative_ranges[:-1], cumulative_ranges[1:])}
+
+        for (name, fraction_range) in label_ranges.items():
+            scope['{}_generator'.format(name)] = make_batches(
+                coarse_records, self.arguments['batch_size'], self.arguments['neighborhood_size'],
+                max_atoms, len(all_residue_types), global_type_remaps, y_scale,
+                fraction_range, self.arguments['seed'])
+
+        if 'validation_generator' not in scope:
             scope['validation_generator'] = scope['train_generator']
-        scope['test_generator'] = make_batches(
-            test_records, self.arguments['batch_size'], self.arguments['neighborhood_size'],
-            max_atoms, len(all_residue_types), global_type_remaps, y_scale)
 
         scope['x_scale'] = self.arguments['x_scale']
         scope['y_scale'] = self.arguments['y_scale']
