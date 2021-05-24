@@ -51,6 +51,7 @@ add_subpkg(subpkg, module_names)
 
 subpkg = 'viz'
 module_names = [
+    'BackmapCoarseGrainViewer',
     'MoleculeAttentionViewer',
 ]
 add_subpkg(subpkg, module_names)
