@@ -55,7 +55,7 @@ class MD17(flowws.Stage):
         for name in self.arguments['molecules']:
             fname = self._download(name)
             loaded_files[fname] = data = np.load(fname, mmap_mode='r')
-            (frames, size, _) = data['R'].shape
+            (frames, size, types) = self.get_trajectory_size_types(data)
             max_atoms = max(max_atoms, size)
 
             indices = np.arange(frames)
@@ -63,38 +63,19 @@ class MD17(flowws.Stage):
             train_indices[fname] = indices[:N_train]
             val_indices[fname] = indices[N_train:N_train + N_val]
             test_indices[fname] = indices[N_train + N_val:N_train + N_val + N_test]
-            seen_types.update(data['z'])
+            seen_types.update(types)
 
         all_types = [0] + list(sorted(seen_types))
         type_map = {t: i for (i, t) in enumerate(all_types)}
         num_types = len(all_types)
-
-        def get_encoding(data, indices=None):
-            coords = data['R']
-            forces = data['F']*energy_conversion
-            types = np.zeros(max_atoms, dtype=np.uint32)
-            types[:coords.shape[1]] = [type_map[t] for t in data['z']]
-
-            if indices is not None:
-                coords = coords[indices]
-                forces = forces[indices]
-
-            rs = np.zeros((len(coords), max_atoms, 3))
-            rs[:, :coords.shape[1], :] = coords
-
-            Fs = np.zeros((len(coords), max_atoms, 3))
-            Fs[:, :coords.shape[1], :] = forces
-
-            types_onehot = np.eye(num_types)[types]
-            types_onehot = np.tile(types_onehot[np.newaxis, ...], (len(coords), 1, 1))
-            return (rs, types_onehot), Fs
 
         datasets = {}
         for name in ['train', 'val', 'test']:
             dset_xs, dset_ts, dset_ys = [], [], []
             for fname in sorted(loaded_files):
                 indices = locals()['{}_indices'.format(name)]
-                (xs, ts), Us = get_encoding(loaded_files[fname], indices[fname])
+                (xs, ts), Us = self.get_encoding(
+                    loaded_files[fname], max_atoms, type_map, indices[fname], energy_conversion)
                 dset_xs.append(xs)
                 dset_ts.append(ts)
                 dset_ys.append(Us)
@@ -156,6 +137,32 @@ class MD17(flowws.Stage):
             subprocess.check_call(command)
 
         return os.path.join(self.arguments['cache_dir'], fname)
+
+    @staticmethod
+    def get_encoding(data, max_atoms, type_map, indices=None, energy_conversion=1.):
+        coords = data['R']
+        forces = data['F']*energy_conversion
+        types = np.zeros(max_atoms, dtype=np.uint32)
+        types[:coords.shape[1]] = [type_map[t] for t in data['z']]
+
+        if indices is not None:
+            coords = coords[indices]
+            forces = forces[indices]
+
+        rs = np.zeros((len(coords), max_atoms, 3))
+        rs[:, :coords.shape[1], :] = coords
+
+        Fs = np.zeros((len(coords), max_atoms, 3))
+        Fs[:, :coords.shape[1], :] = forces
+
+        types_onehot = np.eye(len(type_map))[types]
+        types_onehot = np.tile(types_onehot[np.newaxis, ...], (len(coords), 1, 1))
+        return (rs, types_onehot), Fs
+
+    @staticmethod
+    def get_trajectory_size_types(data):
+        (frames, size, _) = data['R'].shape
+        return (frames, size, data['z'])
 
     @staticmethod
     def get_url(name):

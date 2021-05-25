@@ -37,6 +37,7 @@ module_names = [
     'PDBCache',
     'PDBCoarseGrained',
     'PyriodicDataset',
+    'RMD17',
 ]
 add_subpkg(subpkg, module_names)
 
