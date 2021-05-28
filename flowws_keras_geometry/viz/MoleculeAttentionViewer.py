@@ -47,6 +47,7 @@ def load_model(fname, path_substitutions):
         attention_model, (train_xs, train_ts), scope['validation_data'],
         batch_size, type_map)
 
+@flowws.add_stage_arguments
 class MoleculeAttentionViewer(flowws.Stage):
     """Plot pairwise attention for molecules.
 

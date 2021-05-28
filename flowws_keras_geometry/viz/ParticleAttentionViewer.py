@@ -50,6 +50,7 @@ def load_model(fname, path_substitutions):
         attention_model, (train_xs, train_ts),
         test_data, batch_size)
 
+@flowws.add_stage_arguments
 class ParticleAttentionViewer(flowws.Stage):
     """Plot pairwise attention for small particle neighborhoods.
 
