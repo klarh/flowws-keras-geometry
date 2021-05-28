@@ -59,6 +59,16 @@ def load_model(fname, path_substitutions):
 
 @flowws.add_stage_arguments
 class BackmapCoarseGrainViewer(flowws.Stage):
+    """Visualize the results of backmapped coarse-grainings.
+
+    This module creates a plato scene to visualize a coarse-grained
+    system and the predicted fine-scale coordinates of a trained
+    model. It loads a gtar file containing a trained model and flowws
+    workflow definition (using `PDBCoarseGrained`, for example) and
+    enables visualization of the coarse- and fine-grained coordinates.
+
+    """
+
     ARGS = [
         Arg('filename', '-f', str,
             help='Saved model to open'),

@@ -113,6 +113,14 @@ def make_batches(cg_records, batch_size, neighborhood_size,
 
 @flowws.add_stage_arguments
 class PDBCoarseGrained(flowws.Stage):
+    """Generate data for backmapping coarse-graining of structures from the PDB.
+
+    This module calculates coarse-grained versions of PDB records,
+    loaded using `PDBCache`. Generators are produced for model
+    training.
+
+    """
+
     ARGS = [
         Arg('neighborhood_size', '-n', int,
            help='Neighborhood size to use'),

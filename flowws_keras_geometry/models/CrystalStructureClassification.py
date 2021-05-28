@@ -7,6 +7,14 @@ from .internal import VectorAttention
 
 @flowws.add_stage_arguments
 class CrystalStructureClassification(flowws.Stage):
+    """Build a geometric attention network for the structure identification task.
+
+    This module specifies the architecture of a network to classify
+    local environments of crystal structures in a rotation-invariant
+    manner.
+
+    """
+
     ARGS = [
         Arg('rank', None, int, 2,
             help='Degree of correlations (n-vectors) to consider'),

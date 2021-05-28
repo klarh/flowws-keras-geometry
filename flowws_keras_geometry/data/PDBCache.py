@@ -76,6 +76,14 @@ def parse_pdb(filename, ignore_hydrogens=False):
 
 @flowws.add_stage_arguments
 class PDBCache(flowws.Stage):
+    """Load PDB records and cache them in a local directory.
+
+    This module stores and reads atomic coordinates from a set of
+    specified PDB records. Files are cached in a local directory to
+    avoid repeated downloads.
+
+    """
+
     ARGS = [
         Arg('cache_directory', None, str, '/tmp',
            help='Cache directory to use for downloaded PDB records'),

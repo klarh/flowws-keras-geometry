@@ -48,6 +48,16 @@ def load_model(fname, path_substitutions):
         batch_size, type_map)
 
 class MoleculeAttentionViewer(flowws.Stage):
+    """Plot pairwise attention for molecules.
+
+    This module creates a plato scene to visualize atoms in a molecule
+    and the attention map of a trained model. It loads a gtar file
+    containing a trained model and flowws workflow definition (using
+    `MD17`, for example) and enables visualization of the atomic
+    coordinates and pairwise attention.
+
+    """
+
     ARGS = [
         Arg('filename', '-f', str,
             help='Saved model to open'),

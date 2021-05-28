@@ -19,6 +19,15 @@ def encode_types(source_types, dest_types, N, max_types):
 
 @flowws.add_stage_arguments
 class PyriodicDataset(flowws.Stage):
+    """Load crystal structures from `pyriodic` for training data.
+
+    This module takes a specified set of structures from the
+    `pyriodic` default database, replicates them up to the given size,
+    applies Gaussian noise to each structure one or more times, and
+    extracts local environments of these structures for training data.
+
+    """
+
     ARGS = [
         Arg('num_neighbors', '-n', int, 12,
            help='Number of nearest neighbors to use'),

@@ -88,6 +88,13 @@ class CoarseGrainAttention(Vector2VectorAttention):
 
 @flowws.add_stage_arguments
 class PDBInverseCoarseGrain(flowws.Stage):
+    """Build a geometric attention network for a coarse-grain backmapping task.
+
+    This module specifies the architecture of a network to produce
+    atomic coordinates from a set of coarse-grained beads.
+
+    """
+
     ARGS = [
         Arg('rank', None, int, 2,
             help='Degree of correlations (n-vectors) to consider'),

@@ -11,6 +11,14 @@ from .MD17 import MD17
 
 @flowws.add_stage_arguments
 class RMD17(MD17):
+    """Load data from the RMD17 dataset for molecular force regression.
+
+    This module downloads the entire RMD17 dataset. It randomly
+    selects molecule snapshots for the specified molecules to produce
+    training, testing, and validation sets.
+
+    """
+
     def _download(self, name):
         fname = 'rmd17_{}.npz'.format(name.split('_')[0])
 

@@ -10,6 +10,17 @@ from .internal import ScaledMSE, ScaledMAE
 
 @flowws.add_stage_arguments
 class MD17(flowws.Stage):
+    """Load data from the MD17 dataset for molecular force regression.
+
+    This module downloads files from the MD17 dataset as required. It
+    randomly selects molecule snapshots for the specified molecules to
+    produce training, testing, and validation sets.
+
+    For benzene in particular, the "old" benzene calculation of the
+    original MD17 dataset is used.
+
+    """
+
     ARGS = [
         Arg('n_train', '-n', int, 1000,
             help='Number of frames to take for training'),

@@ -25,6 +25,15 @@ NORMALIZATION_LAYER_DOC = ' (any of {})'.format(','.join(NORMALIZATION_LAYERS))
 
 @flowws.add_stage_arguments
 class MoleculeForceRegression(flowws.Stage):
+    """Build a geometric attention network for the molecular force regression task.
+
+    This module specifies the architecture of a network to calculate
+    atomic forces given the coordinates and types of atoms in a
+    molecule. Conservative forces are computed by calculating the
+    gradient of a scalar.
+
+    """
+
     ARGS = [
         Arg('rank', None, int, 2,
             help='Degree of correlations (n-vectors) to consider'),

@@ -7,6 +7,8 @@ HUGE_FLOAT = 1e9
 
 @tf.custom_gradient
 def custom_norm(x):
+    """Calculate the norm of a set of vector-like quantities, with some
+    numeric stabilization applied to the gradient."""
     y = tf.linalg.norm(x, axis=-1, keepdims=True)
 
     def grad(dy):
@@ -15,7 +17,12 @@ def custom_norm(x):
     return y, grad
 
 def bivec_dual(b):
-    """scalar + bivector -> vector + trivector"""
+    """scalar + bivector -> vector + trivector
+
+    Calculates the dual of an input value, expressed as (scalar,
+    bivector) with basis (1, e12, e13, e23).
+
+    """
     swizzle = tf.constant([
         [0, 0, 0, -1],
         [0, 0, 1, 0],
@@ -25,7 +32,13 @@ def bivec_dual(b):
     return tf.tensordot(b, swizzle, 1)
 
 def vecvec(a, b):
-    """vector*vector -> scalar + bivector"""
+    """vector*vector -> scalar + bivector
+
+    Calculates the product of two vector inputs with basis (e1, e2,
+    e3). Produces a (scalar, bivector) output with basis (1, e12, e13,
+    e23).
+
+    """
     products = a[..., tf.newaxis]*b[..., tf.newaxis, :]
     old_shape = tf.shape(products)
     new_shape = tf.concat([old_shape[:-2], [9]], -1)
@@ -47,15 +60,32 @@ def vecvec(a, b):
     return tf.tensordot(products, swizzle, 1)
 
 def vecvec_invariants(p):
+    """Calculates rotation-invariant attributes of a (scalar, bivector) quantity.
+
+    Returns a 2D output: the scalar and norm of the bivector.
+
+    """
     result = [p[..., :1], custom_norm(p[..., 1:4])]
     return tf.concat(result, axis=-1)
 
 def vecvec_covariants(p):
+    """Calculates rotation-covariant attributes of a (scalar, bivector) quantity.
+
+    Converts the bivector to a vector by taking the dual.
+
+    """
     dual = bivec_dual(p)
     return dual[..., :3]
 
 def bivecvec(p, c):
-    """(scalar + bivector)*vector -> vector + trivector"""
+    """(scalar + bivector)*vector -> vector + trivector
+
+    Calculates the product of a (scalar + bivector) and a vector. The
+    two inputs are expressed in terms of the basis (1, e12, e13, e23)
+    and (e1, e2, e3); the output is expressed in terms of the basis
+    (e1, e2, e3, e123).
+
+    """
     products = p[..., tf.newaxis]*c[..., tf.newaxis, :]
     old_shape = tf.shape(products)
     new_shape = tf.concat([old_shape[:-2], [12]], -1)
@@ -81,14 +111,31 @@ def bivecvec(p, c):
     return tf.tensordot(products, swizzle, 1)
 
 def bivecvec_invariants(q):
+    """Calculates rotation-invariant attributes of a (vector, trivector) quantity.
+
+    Returns a 2D output: the norm of the vector and the trivector.
+
+    """
     result = [custom_norm(q[..., :3]), q[..., 3:4]]
     return tf.concat(result, axis=-1)
 
 def bivecvec_covariants(q):
+    """Calculates rotation-covariant attributes of a (vector, trivector) quantity.
+
+    Returns the vector.
+
+    """
     return q[..., :3]
 
 def trivecvec(q, d):
-    """(vector + trivector)*vector -> scalar + bivector"""
+    """(vector + trivector)*vector -> scalar + bivector
+
+    Calculates the product of a (vector + trivector) and a vector. The
+    two inputs are expressed in terms of the basis (e1, e2, e3, e123)
+    and (e1, e2, e3); the output is expressed in terms of the basis
+    (1, e12, e13, e23).
+
+    """
     products = q[..., tf.newaxis]*d[..., tf.newaxis, :]
     old_shape = tf.shape(products)
     new_shape = tf.concat([old_shape[:-2], [12]], -1)
@@ -118,10 +165,12 @@ trivecvec_invariants = vecvec_invariants
 trivecvec_covariants = vecvec_covariants
 
 class GradientLayer(keras.layers.Layer):
+    """Calculates the gradient of one input with respect to the other."""
     def call(self, inputs):
         return tf.gradients(inputs[0], inputs[1])
 
 class MomentumNormalization(keras.layers.Layer):
+    """Exponential decay normalization."""
     def __init__(self, momentum=.99, epsilon=1e-7, *args, **kwargs):
         self.momentum = momentum
         self.epsilon = epsilon
@@ -151,6 +200,7 @@ class MomentumNormalization(keras.layers.Layer):
         return result
 
 class NeighborhoodReduction(keras.layers.Layer):
+    """Reduce values over the local neighborhood axis."""
     def __init__(self, mode='sum', *args, **kwargs):
         self.mode = mode
 
@@ -175,12 +225,14 @@ class NeighborhoodReduction(keras.layers.Layer):
         return result
 
 class PairwiseValueNormalization(keras.layers.Layer):
+    """Normalize values over the -2 and -3 dimensions of output."""
     def call(self, inputs, training=False):
         mu = tf.math.reduce_mean(inputs, axis=(-2, -3), keepdims=True)
         sigma = tf.math.reduce_std(inputs, axis=(-2, -3), keepdims=True)
         return (inputs - mu)/sigma
 
 class PairwiseVectorDifference(keras.layers.Layer):
+    """Calculate the difference of all pairs of vectors in the neighborhood axis."""
     def call(self, inputs):
         return inputs[..., None, :] - inputs[..., None, :, :]
 
@@ -195,6 +247,7 @@ class PairwiseVectorDifference(keras.layers.Layer):
         return mask
 
 class PairwiseVectorDifferenceSum(keras.layers.Layer):
+    """Calculate the symmetric difference and sum of all pairs of vectors in the neighborhood axis."""
     def call(self, inputs):
         return tf.concat([
             inputs[..., None, :] - inputs[..., None, :, :],
@@ -210,6 +263,21 @@ class PairwiseVectorDifferenceSum(keras.layers.Layer):
         return mask
 
 class VectorAttention(keras.layers.Layer):
+    """Calculates geometric product attention.
+
+    This layer implements a set of geometric products over all tuples
+    of length `rank`, then sums over them using an attention mechanism
+    to perform a permutation-covariant (`reduce=False`) or
+    permutation-invariant (`reduce=True`) result.
+
+    :param score_net: keras `Sequential` network producing logits for the attention mechanism
+    :param value_net: keras `Sequential` network producing values in the embedding dimension of the network
+    :param reduce: if `True`, produce a permutation-invariant result; otherwise, produce a permutation-covariant result
+    :param merge_fun: Function used to merge the input values of each tuple before being passed to `join_fun`: 'mean' (no parameters) or 'concat' (learned projection for each tuple position)
+    :param join_fun: Function used to join the representations of the rotation-invariant quantities (produced by `value_net`) and the tuple summary (produced by `merge_fun`): 'mean' (no parameters) or 'concat' (learned projection for each representation)
+    :param rank: Degree of correlations to consider. 2 for pairwise attention, 3 for triplet-wise attention, and so on. Memory and computational complexity scales as `N**rank`
+
+    """
     def __init__(self, score_net, value_net, reduce=True,
                  merge_fun='mean', join_fun='mean', rank=2,
                  *args, **kwargs):
@@ -374,6 +442,14 @@ class VectorAttention(keras.layers.Layer):
         return result
 
 class Vector2VectorAttention(VectorAttention):
+    """Adaptation of `VectorAttention` to produce vector outputs.
+
+    Cf. `VectorAttention` for most arguments.
+
+    :param scale_net: keras `Sequential` network producing scalar rescaling factors for each vector
+
+    """
+
     def __init__(self, score_net, value_net, scale_net, *args, **kwargs):
         self.scale_net = scale_net
         super().__init__(score_net, value_net, *args, **kwargs)
