@@ -57,6 +57,9 @@ class MoleculeAttentionViewer(flowws.Stage):
     `MD17`, for example) and enables visualization of the atomic
     coordinates and pairwise attention.
 
+    Workflows run on different systems will likely require use of the
+    `path_substitutions` argument for their data-loading modules.
+
     """
 
     ARGS = [

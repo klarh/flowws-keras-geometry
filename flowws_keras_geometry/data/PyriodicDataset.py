@@ -73,15 +73,19 @@ class PyriodicDataset(flowws.Stage):
 
                 q = freud.locality.AABBQuery(structure.box, structure.positions)
                 qr = q.query(
-                    structure.positions, dict(num_neighbors=self.arguments['num_neighbors'], exclude_ii=True))
+                    structure.positions, dict(
+                        num_neighbors=self.arguments['num_neighbors'], exclude_ii=True))
                 nl = qr.toNeighborList()
-                rijs = structure.positions[nl.point_indices] - structure.positions[nl.query_point_indices]
+                rijs = (structure.positions[nl.point_indices] -
+                        structure.positions[nl.query_point_indices])
                 fbox = freud.box.Box(*structure.box)
                 rijs = fbox.wrap(rijs)
-                rijs = rijs.reshape((len(structure), self.arguments['num_neighbors'], 3))
+                rijs = rijs.reshape(
+                    (len(structure), self.arguments['num_neighbors'], 3))
 
                 tijs = encode_types(
-                    structure.types[nl.query_point_indices], structure.types[nl.point_indices],
+                    structure.types[nl.query_point_indices],
+                    structure.types[nl.point_indices],
                     self.arguments['num_neighbors'], max_types)
 
                 shuf = np.arange(len(rijs))

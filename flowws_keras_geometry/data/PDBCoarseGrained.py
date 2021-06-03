@@ -123,7 +123,7 @@ class PDBCoarseGrained(flowws.Stage):
 
     ARGS = [
         Arg('neighborhood_size', '-n', int,
-           help='Neighborhood size to use'),
+           help='Neighborhood size (number of input amino acid coordinates) to use'),
         Arg('batch_size', '-b', int, 32,
            help='Batch size to use'),
         Arg('seed', '-s', int, 14,
@@ -144,7 +144,9 @@ class PDBCoarseGrained(flowws.Stage):
         coarse_records = {}
         skipped_records = []
         for (name, rec) in all_records.items():
-            coarse = coarse_grain(rec, self.arguments['neighborhood_size'], self.arguments['x_scale'])
+            coarse = coarse_grain(
+                rec, self.arguments['neighborhood_size'], self.arguments['x_scale'])
+
             if any(np.max(np.bincount(ts)) > 1 for ts in coarse.child_types):
                 skipped_records.append((name, 'duplicate child types'))
                 continue
@@ -152,6 +154,7 @@ class PDBCoarseGrained(flowws.Stage):
                 skipped_records.append((name, 'too few positions'))
                 continue
             coarse_records[name] = coarse
+
         scope['coarse_records'] = coarse_records
         scope['skipped_records'] = skipped_records
         print('{} final records'.format(len(coarse_records)))
@@ -172,9 +175,10 @@ class PDBCoarseGrained(flowws.Stage):
         global_type_remaps = {}
         for (name, rec) in coarse_records.items():
             res_type_remap = [residue_type_map[name] for name in rec.type_names]
+            res_type_remap = np.array(res_type_remap, dtype=np.uint32)
             atom_type_remap = [atom_type_map[name] for name in rec.child_type_names]
-            global_type_remaps[name] = (
-                np.array(res_type_remap, dtype=np.uint32), np.array(atom_type_remap, dtype=np.uint32))
+            atom_type_remap = np.array(atom_type_remap, dtype=np.uint32)
+            global_type_remaps[name] = (res_type_remap, atom_type_remap)
 
         print('Max number of atoms in a residue:', max_atoms)
 

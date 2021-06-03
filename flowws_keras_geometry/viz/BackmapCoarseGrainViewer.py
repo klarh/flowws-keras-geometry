@@ -67,6 +67,9 @@ class BackmapCoarseGrainViewer(flowws.Stage):
     workflow definition (using `PDBCoarseGrained`, for example) and
     enables visualization of the coarse- and fine-grained coordinates.
 
+    Workflows run on different systems will likely require use of the
+    `path_substitutions` argument for their data-loading modules.
+
     """
 
     ARGS = [

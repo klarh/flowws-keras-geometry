@@ -60,6 +60,9 @@ class ParticleAttentionViewer(flowws.Stage):
     definition (using `PyriodicDataset`, for example) and enables
     visualization of the coordinates and pairwise particle attention.
 
+    Workflows run on different systems will likely require use of the
+    `path_substitutions` argument for their data-loading modules.
+
     """
 
     ARGS = [
