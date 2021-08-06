@@ -447,12 +447,50 @@ class Vector2VectorAttention(VectorAttention):
     Cf. `VectorAttention` for most arguments.
 
     :param scale_net: keras `Sequential` network producing scalar rescaling factors for each vector
+    :param use_product_vectors: Use the vector extracted from the geometric product of each tuple within the attention mechanism
+    :param use_input_vectors: Use the input vectors for each tuple within the attention mechanism. A scalar weight will be learned for each (i, j, k, ...) element of the tuple
+    :param learn_vector_projection: Use a learned linear projection combination factor for the summary value (for the product vector) and the input values (for the input vectors)
 
     """
 
-    def __init__(self, score_net, value_net, scale_net, *args, **kwargs):
-        self.scale_net = scale_net
+    def __init__(self, score_net, value_net, scale_net, *args,
+                 use_product_vectors=True, use_input_vectors=False,
+                 learn_vector_projection=False,
+                 **kwargs):
         super().__init__(score_net, value_net, *args, **kwargs)
+
+        self.scale_net = scale_net
+        self.use_product_vectors = use_product_vectors
+        self.use_input_vectors = use_input_vectors
+        self.learn_vector_projection = learn_vector_projection
+
+        self.input_vector_count = (
+            int(self.use_product_vectors) + self.rank*self.use_input_vectors)
+        if self.input_vector_count < 1:
+            raise ValueError('At least one of use_product_vectors or '
+                             'use_input_vectors must be True')
+
+    def _covariants(self, covariants_, positions, broadcast_indices, expanded_values,
+                    joined_values):
+        covariant_vectors = []
+        input_values = []
+        if self.use_product_vectors:
+            covariant_vectors.append(covariants_)
+            input_values.append(joined_values)
+        if self.use_input_vectors:
+            covariant_vectors.extend(
+                [positions[idx] for idx in broadcast_indices])
+            input_values.extend(expanded_values)
+
+        scalars = self.vector_kernels
+        if self.learn_vector_projection:
+            scalars = [tf.tensordot(v, kernel, 1) + self.vector_biases[i]
+                       for i, (v, kernel) in
+                       enumerate(zip(input_values, self.vector_kernels))]
+
+        covariants = [
+            vec*scalars[i] for (i, vec) in enumerate(covariant_vectors)]
+        return sum(covariants)
 
     def _intermediates(self, inputs, mask=None):
         (positions, values) = inputs
@@ -462,6 +500,8 @@ class Vector2VectorAttention(VectorAttention):
         invar_values = self.value_net(invariants)
 
         joined_values = self.join_fun_(invar_values, neighborhood_values)
+        covariants = self._covariants(
+            covariants, positions, broadcast_indices, expanded_values, joined_values)
 
         scales = self.scale_net(joined_values)
         scores = self.score_net(joined_values)
@@ -496,6 +536,26 @@ class Vector2VectorAttention(VectorAttention):
 
         return dict(attention=attention, output=output, invariants=invariants)
 
+    def build(self, input_shape):
+        (_, value_shape) = input_shape
+        value_dim = value_shape[-1]
+
+        self.vector_kernels = [1]
+        self.vector_biases = [0]
+        if self.use_input_vectors:
+            if self.learn_vector_projection:
+                self.vector_kernels = [self.add_weight(
+                    name='vector_kernels_{}'.format(i), shape=[value_dim, 1])
+                    for i in range(self.input_vector_count)]
+                self.vector_biases = self.add_weight(
+                    name='vector_biases', shape=[self.input_vector_count],
+                    initializer=keras.initializers.RandomNormal(mean=0.))
+            else:
+                self.vector_kernels = self.add_weight(
+                    name='vector_kernels', shape=[self.input_vector_count],
+                    initializer=keras.initializers.RandomNormal(mean=0.))
+        return super().build(input_shape)
+
     @classmethod
     def from_config(cls, config):
         new_config = dict(config)
@@ -506,4 +566,7 @@ class Vector2VectorAttention(VectorAttention):
     def get_config(self):
         result = super().get_config()
         result['scale_net'] = self.scale_net.get_config()
+        result['use_product_vectors'] = self.use_product_vectors
+        result['use_input_vectors'] = self.use_input_vectors
+        result['learn_vector_projection'] = self.learn_vector_projection
         return result
