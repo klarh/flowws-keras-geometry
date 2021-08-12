@@ -1,3 +1,4 @@
+import collections
 import itertools
 
 import tensorflow as tf
@@ -262,6 +263,9 @@ class PairwiseVectorDifferenceSum(keras.layers.Layer):
         mask = tf.logical_and(mask[..., None], mask[..., None, :])
         return mask
 
+_AttentionInputType = collections.namedtuple(
+    'AttentionInputType', ['positions', 'values', 'weights'])
+
 class VectorAttention(keras.layers.Layer):
     """Calculates geometric product attention.
 
@@ -307,7 +311,9 @@ class VectorAttention(keras.layers.Layer):
         super().__init__(*args, **kwargs)
 
     def build(self, input_shape):
-        (r_shape, v_shape) = input_shape
+        shapes = self._parse_inputs(input_shape)
+        r_shape = shapes.positions
+        v_shape = shapes.values
 
         self.merge_kernels = None
         if self.merge_fun == 'concat':
@@ -359,7 +365,9 @@ class VectorAttention(keras.layers.Layer):
         return broadcast_indices, invar, covar, expanded_vs
 
     def _intermediates(self, inputs, mask=None):
-        (positions, values) = inputs
+        parsed_inputs = self._parse_inputs(inputs)
+        positions = parsed_inputs.positions
+        values = parsed_inputs.values
         (broadcast_indices, invariants, _, expanded_values) = \
             self._expand_products(positions, values)
         neighborhood_values = self.merge_fun_(*expanded_values)
@@ -368,11 +376,14 @@ class VectorAttention(keras.layers.Layer):
         joined_values = self.join_fun_(invar_values, neighborhood_values)
         new_values = joined_values
 
+        tuple_weights = self._make_tuple_weights(broadcast_indices, parsed_inputs.weights)
         scores = self.score_net(joined_values)
         old_shape = tf.shape(scores)
 
         if mask is not None:
-            (position_mask, value_mask) = mask
+            parsed_mask = self._parse_inputs(mask)
+            position_mask = parsed_mask.positions
+            value_mask = parsed_mask.values
             if position_mask is not None:
                 position_mask = tf.expand_dims(position_mask, -1)
                 position_mask = tf.reduce_all([position_mask[idx] for idx in broadcast_indices[:-1]], axis=0)
@@ -397,9 +408,28 @@ class VectorAttention(keras.layers.Layer):
                            tf.math.reduce_prod(old_shape[dims:], keepdims=True)], -1)
         scores = tf.reshape(scores, shape)
         attention = tf.reshape(tf.nn.softmax(scores), old_shape)
-        output = tf.reduce_sum(attention*new_values, reduce_axes)
+        output = tf.reduce_sum(attention*tuple_weights*new_values, reduce_axes)
 
         return dict(attention=attention, output=output, invariants=invar_values)
+
+    def _make_tuple_weights(self, broadcast_indices, weights):
+        if isinstance(weights, int):
+            return weights
+        expanded_weights = [weights[..., None][idx] for idx in broadcast_indices]
+        result = 1
+        for w in expanded_weights:
+            result = result*w
+        return tf.math.pow(result, 1./self.rank)
+
+    def _parse_inputs(self, inputs):
+        if len(inputs) == 2:
+            (r, v) = inputs
+            w = 1
+        elif len(inputs) == 3:
+            (r, v, w) = inputs
+        else:
+            raise NotImplementedError(inputs)
+        return _AttentionInputType(r, v, w)
 
     def call(self, inputs, return_invariants=False, return_attention=False, mask=None):
         intermediates = self._intermediates(inputs, mask)
@@ -418,7 +448,9 @@ class VectorAttention(keras.layers.Layer):
         if not self.reduce or mask is None:
             return mask
 
-        (position_mask, value_mask) = mask
+        parsed_mask = self._parse_inputs(mask)
+        position_mask = parsed_mask.positions
+        value_mask = parsed_mask.values
         if position_mask is not None:
             return tf.reduce_any(position_mask, axis=-1)
         else:
@@ -493,7 +525,9 @@ class Vector2VectorAttention(VectorAttention):
         return sum(covariants)
 
     def _intermediates(self, inputs, mask=None):
-        (positions, values) = inputs
+        parsed_inputs = self._parse_inputs(inputs)
+        positions = parsed_inputs.positions
+        values = parsed_inputs.values
         (broadcast_indices, invariants, covariants, expanded_values) = \
             self._expand_products(positions, values)
         neighborhood_values = self.merge_fun_(*expanded_values)
@@ -503,12 +537,15 @@ class Vector2VectorAttention(VectorAttention):
         covariants = self._covariants(
             covariants, positions, broadcast_indices, expanded_values, joined_values)
 
+        tuple_weights = self._make_tuple_weights(broadcast_indices, parsed_inputs.weights)
         scales = self.scale_net(joined_values)
         scores = self.score_net(joined_values)
         old_shape = tf.shape(scores)
 
         if mask is not None:
-            (position_mask, value_mask) = mask
+            parsed_mask = self._parse_inputs(mask)
+            position_mask = parsed_mask.positions
+            value_mask = parsed_mask.values
             if position_mask is not None:
                 position_mask = tf.expand_dims(position_mask, -1)
                 position_mask = tf.reduce_all([position_mask[idx] for idx in broadcast_indices[:-1]], axis=0)
@@ -532,12 +569,13 @@ class Vector2VectorAttention(VectorAttention):
         shape = tf.concat([old_shape[:dims], tf.math.reduce_prod(old_shape[dims:], keepdims=True)], -1)
         scores = tf.reshape(scores, shape)
         attention = tf.reshape(tf.nn.softmax(scores), old_shape)
-        output = tf.reduce_sum(attention*covariants*scales, reduce_axes)
+        output = tf.reduce_sum(attention*tuple_weights*covariants*scales, reduce_axes)
 
         return dict(attention=attention, output=output, invariants=invariants)
 
     def build(self, input_shape):
-        (_, value_shape) = input_shape
+        parsed_inputs = self._parse_inputs(input_shape)
+        value_shape = parsed_inputs.values
         value_dim = value_shape[-1]
 
         self.vector_kernels = [1]
