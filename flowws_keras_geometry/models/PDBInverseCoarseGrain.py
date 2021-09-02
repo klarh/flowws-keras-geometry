@@ -116,6 +116,10 @@ class PDBInverseCoarseGrain(flowws.Stage):
             help='If True, use residual connections within blocks'),
         Arg('activation', '-a', str, 'relu',
             help='Activation function to use inside the network'),
+        Arg('attention_vector_inputs', None, bool, False,
+            help='Use input vectors for vector-vector attention'),
+        Arg('attention_learn_projection', None, bool, False,
+            help='Use learned projection weights for vector-vector attention'),
     ]
 
     def run(self, scope, storage):
@@ -172,7 +176,9 @@ class PDBInverseCoarseGrain(flowws.Stage):
 
             (vec, ivs, att) = Vector2VectorAttention(
                 make_scorefun(), make_valuefun(n_dim), make_valuefun(1), True, rank=rank,
-                join_fun=join_fun, merge_fun=merge_fun)(
+                join_fun=join_fun, merge_fun=merge_fun,
+                use_input_vectors=self.arguments['attention_vector_inputs'],
+                learn_vector_projection=self.arguments['attention_learn_projection'])(
                     [delta_x, delta_v], return_invariants=True, return_attention=True)
 
             if self.arguments['residual']:
