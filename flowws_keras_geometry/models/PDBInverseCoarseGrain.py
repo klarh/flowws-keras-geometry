@@ -114,10 +114,8 @@ class PDBInverseCoarseGrain(flowws.Stage):
             help='If True, add a nonlinearity to the end of each block'),
         Arg('residual', '-r', bool, True,
             help='If True, use residual connections within blocks'),
-        Arg('activation', '-a', str, 'swish',
+        Arg('activation', '-a', str, 'relu',
             help='Activation function to use inside the network'),
-        Arg('final_activation', None, str, 'swish',
-            help='Final activation function to use within the network'),
     ]
 
     def run(self, scope, storage):
@@ -140,7 +138,7 @@ class PDBInverseCoarseGrain(flowws.Stage):
         def make_scorefun():
             layers = [keras.layers.Dense(dilation_dim)]
 
-            layers.append(keras.layers.Activation('swish'))
+            layers.append(keras.layers.Activation(self.arguments['activation']))
 
             layers.append(keras.layers.Dense(1))
             return keras.models.Sequential(layers)
@@ -149,7 +147,7 @@ class PDBInverseCoarseGrain(flowws.Stage):
             layers = [keras.layers.Dense(dilation_dim)]
             layers.append(keras.layers.LayerNormalization())
 
-            layers.append(keras.layers.Activation('swish'))
+            layers.append(keras.layers.Activation(self.arguments['activation']))
 
             layers.append(keras.layers.Dense(dim))
             return keras.models.Sequential(layers)
