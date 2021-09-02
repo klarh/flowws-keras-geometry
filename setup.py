@@ -50,6 +50,7 @@ module_names = [
     'CrystalStructureClassification',
     'MoleculeForceRegression',
     'PDBInverseCoarseGrain',
+    'PDBInverseCoarseGrainTransformer',
 ]
 add_subpkg(subpkg, module_names)
 
