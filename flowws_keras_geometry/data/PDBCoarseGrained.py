@@ -41,7 +41,8 @@ def coarse_grain(record, num_neighbors=4, x_scale=1.):
         child_positions, child_types, record.type_names)
 
 def loop_neighborhood_environments(
-        rec, neighborhood_size, seed=13, fraction_range=(0, 2.)):
+        rec, neighborhood_size, seed=13, fraction_range=(0, 2.),
+        randomly_rotate=False):
 
     rand = np.random.default_rng(seed)
     index_i = rec.nlist.query_point_indices
@@ -68,6 +69,12 @@ def loop_neighborhood_environments(
             rchildren = rec.child_positions[i] - r0
             tchildren = rec.child_types[i]
 
+            if randomly_rotate:
+                import rowan
+                q = rowan.random.rand(1)[None]
+                rij = rowan.rotate(q, rij)
+                rchildren = rowan.rotate(q, rchildren)
+
             yield rij, types_i, types_j, rchildren, tchildren
 
 def randomly_loop_iter(xs, seed):
@@ -79,14 +86,15 @@ def randomly_loop_iter(xs, seed):
 
 def make_batches(cg_records, batch_size, neighborhood_size,
                  max_atoms, max_types, global_type_remaps, y_scale=1.,
-                 fraction_range=(0, 2.), seed=13):
+                 fraction_range=(0, 2.), seed=13, randomly_rotate=False):
     rand = random.Random(seed)
     name_iter = randomly_loop_iter(sorted(cg_records), rand.randint(0, 2**32))
 
     iterators = {}
     for (name, rec) in sorted(cg_records.items()):
         iterators[name] = loop_neighborhood_environments(
-            rec, neighborhood_size, rand.randint(0, 2**32), fraction_range)
+            rec, neighborhood_size, rand.randint(0, 2**32), fraction_range,
+            randomly_rotate=randomly_rotate)
 
     while True:
         cg_rij = np.zeros((batch_size, neighborhood_size, 3), dtype=np.float32)
@@ -136,6 +144,8 @@ class PDBCoarseGrained(flowws.Stage):
            help='Factor by which to decrease residue length scales'),
         Arg('y_scale', '-y', float, 8.,
            help='Factor by which to decrease atomic length scales'),
+        Arg('randomly_rotate', '-r', bool, False,
+            help='If True, randomly rotate environments'),
     ]
 
     def run(self, scope, storage):
@@ -206,7 +216,8 @@ class PDBCoarseGrained(flowws.Stage):
             scope['{}_generator'.format(name)] = make_batches(
                 coarse_records, self.arguments['batch_size'], self.arguments['neighborhood_size'],
                 max_atoms, len(all_residue_types), global_type_remaps, y_scale,
-                fraction_range, self.arguments['seed'])
+                fraction_range, self.arguments['seed'],
+                randomly_rotate=self.arguments['randomly_rotate'])
 
         if 'validation_generator' not in scope:
             scope['validation_generator'] = scope['train_generator']
