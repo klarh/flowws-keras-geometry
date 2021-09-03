@@ -49,14 +49,19 @@ def loop_neighborhood_environments(
     index_j = rec.nlist.point_indices
 
     shuffle_indices = np.arange(len(rec.positions))
-    fraction_assignments = rand.random(len(rec.positions))
+    fraction_assignments = np.linspace(0, 1, len(rec.positions), endpoint=False)
+    rand.shuffle(fraction_assignments)
+    filt = np.logical_and(fraction_range[0] <= fraction_assignments,
+                          fraction_assignments < fraction_range[1])
+    if not np.sum(filt):
+        raise ValueError(
+            'No particles found for fraction_range: {}'.format(fraction_range))
+    shuffle_indices = shuffle_indices[filt]
+
     while True:
         rand.shuffle(shuffle_indices)
 
         for i in shuffle_indices:
-            if not (fraction_range[0] <= fraction_assignments[i] < fraction_range[1]):
-                continue
-
             bond_start = rec.nlist.find_first_index(i)
             bond_stop = rec.nlist.find_first_index(i + 1)
             bonds = slice(bond_start, bond_stop)
