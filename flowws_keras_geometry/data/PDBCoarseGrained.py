@@ -93,7 +93,7 @@ def make_batches(cg_records, batch_size, neighborhood_size,
     iterators = {}
     for (name, rec) in sorted(cg_records.items()):
         iterators[name] = loop_neighborhood_environments(
-            rec, neighborhood_size, rand.randint(0, 2**32), fraction_range,
+            rec, neighborhood_size, seed + 1, fraction_range,
             randomly_rotate=randomly_rotate)
 
     while True:
