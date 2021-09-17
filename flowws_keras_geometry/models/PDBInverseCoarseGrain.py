@@ -174,17 +174,18 @@ class PDBInverseCoarseGrain(flowws.Stage):
         def make_vector_block(vec):
             residual_in = vec
 
+            vec = PairwiseVectorDifference()(vec)
             (vec, ivs, att) = Vector2VectorAttention(
                 make_scorefun(), make_valuefun(n_dim), make_valuefun(1), True, rank=rank,
                 join_fun=join_fun, merge_fun=merge_fun,
                 use_input_vectors=self.arguments['attention_vector_inputs'],
                 learn_vector_projection=self.arguments['attention_learn_projection'])(
-                    [delta_x, delta_v], return_invariants=True, return_attention=True)
+                    [vec, delta_v], return_invariants=True, return_attention=True)
 
             if self.arguments['residual']:
                 vec = residual_in + vec
 
-            return vec, ivs, att
+            return vec
 
         last = keras.layers.Dense(n_dim)(v_in)
         for _ in range(self.arguments['n_blocks_coarse']):
@@ -197,12 +198,11 @@ class PDBInverseCoarseGrain(flowws.Stage):
             merge_fun=merge_fun)(
             [x_in, last, cv_emb], return_invariants=True, return_attention=True)
 
-        delta_x = PairwiseVectorDifference()(vec)
         delta_v = PairwiseVectorDifferenceSum()(cv_emb)
         delta_v = keras.layers.Dense(n_dim)(delta_v)
 
         for _ in range(self.arguments['n_blocks_fine']):
-            (vec, ivs, att) = make_vector_block(vec)
+            vec = make_vector_block(vec)
 
         scope['input_symbol'] = [x_in, v_in, cv_in]
         scope['output'] = vec
