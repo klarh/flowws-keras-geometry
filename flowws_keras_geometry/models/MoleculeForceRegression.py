@@ -47,6 +47,8 @@ class MoleculeForceRegression(flowws.Stage):
             help='Method to join invariant and point representations'),
         Arg('dropout', '-d', float, 0,
             help='Dropout rate to use, if any'),
+        Arg('mlp_layers', None, int, 1,
+            help='Number of hidden layers for score/value MLPs'),
         Arg('n_blocks', '-b', int, 2,
             help='Number of deep blocks to use'),
         Arg('block_nonlinearity', None, bool, True,
@@ -88,29 +90,35 @@ class MoleculeForceRegression(flowws.Stage):
         dilation_dim = int(np.round(n_dim*self.arguments['dilation']))
 
         def make_scorefun():
-            layers = [keras.layers.Dense(dilation_dim)]
+            layers = []
 
-            for name in self.arguments['score_normalization']:
-                layers.append(NORMALIZATION_LAYERS[name](rank))
+            for _ in range(self.arguments['mlp_layers']):
+                layers.append(keras.layers.Dense(dilation_dim))
 
-            layers.append(activation_layer())
+                for name in self.arguments['score_normalization']:
+                    layers.append(NORMALIZATION_LAYERS[name](rank))
 
-            if self.arguments.get('dropout', 0):
-                layers.append(keras.layers.Dropout(self.arguments['dropout']))
+                layers.append(activation_layer())
+
+                if self.arguments.get('dropout', 0):
+                    layers.append(keras.layers.Dropout(self.arguments['dropout']))
 
             layers.append(keras.layers.Dense(1))
             return keras.models.Sequential(layers)
 
         def make_valuefun():
-            layers = [keras.layers.Dense(dilation_dim)]
+            layers = []
 
-            for name in self.arguments['value_normalization']:
-                layers.append(NORMALIZATION_LAYERS[name](rank))
+            for _ in range(self.arguments['mlp_layers']):
+                layers.append(keras.layers.Dense(dilation_dim))
 
-            layers.append(activation_layer())
+                for name in self.arguments['value_normalization']:
+                    layers.append(NORMALIZATION_LAYERS[name](rank))
 
-            if self.arguments.get('dropout', 0):
-                layers.append(keras.layers.Dropout(self.arguments['dropout']))
+                layers.append(activation_layer())
+
+                if self.arguments.get('dropout', 0):
+                    layers.append(keras.layers.Dropout(self.arguments['dropout']))
 
             layers.append(keras.layers.Dense(n_dim))
             return keras.models.Sequential(layers)
