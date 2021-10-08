@@ -339,7 +339,7 @@ class VectorAttention(keras.layers.Layer):
         for i in range(1, self.rank + 1):
             index = [Ellipsis] + [None]*(self.rank) + [slice(None)]
             index[-i - 1] = slice(None)
-            broadcast_indices.append(index)
+            broadcast_indices.append(tuple(index))
 
         expanded_vs = [vs[index] for index in broadcast_indices]
         expanded_rs = [rs[index] for index in broadcast_indices]
@@ -385,13 +385,13 @@ class VectorAttention(keras.layers.Layer):
             position_mask = parsed_mask.positions
             value_mask = parsed_mask.values
             if position_mask is not None:
-                position_mask = tf.expand_dims(position_mask, -1)
-                position_mask = tf.reduce_all([position_mask[idx] for idx in broadcast_indices[:-1]], axis=0)
+                masks = [position_mask[..., None][idx] for idx in broadcast_indices]
+                position_mask = sum(masks) == self.rank
             else:
                 position_mask = True
             if value_mask is not None:
-                value_mask = tf.expand_dims(value_mask, -1)
-                value_mask = tf.reduce_all([value_mask[idx] for idx in broadcast_indices[:-1]], axis=0)
+                masks = [value_mask[..., None][idx] for idx in broadcast_indices]
+                value_mask = sum(masks) == self.rank
             else:
                 value_mask = True
             product_mask = tf.logical_and(position_mask, value_mask)
