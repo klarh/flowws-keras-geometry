@@ -55,8 +55,11 @@ class PyriodicDataset(flowws.Stage):
         structures = list(self.arguments['structures'])
         max_types = 0
         for name in structures:
+            structure = None
             for (structure,) in pyriodic.db.query('select structure from unit_cells where name = ?', (name,)):
                 pass
+            if structure is None:
+                raise ValueError('Structure {} not found'.format(name))
             max_types = max(max_types, len(set(structure.types)))
 
         for name in structures:
