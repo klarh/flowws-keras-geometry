@@ -3,7 +3,7 @@ from flowws import Argument as Arg
 import numpy as np
 from tensorflow import keras
 
-from .internal import VectorAttention
+from .internal import VectorAttention, NeighborDistanceNormalization
 
 @flowws.add_stage_arguments
 class CrystalStructureClassification(flowws.Stage):
@@ -38,6 +38,8 @@ class CrystalStructureClassification(flowws.Stage):
             help='Activation function to use inside the network'),
         Arg('final_activation', None, str, 'relu',
             help='Final activation function to use within the network'),
+        Arg('scale_invariant', None, str,
+            help='Make model scale-invariant by normalizing point clouds by the given distance (one of "min", "mean")'),
     ]
 
     def run(self, scope, storage):
@@ -74,7 +76,7 @@ class CrystalStructureClassification(flowws.Stage):
             last = VectorAttention(
                 make_scorefun(), make_valuefun(), False, rank=self.arguments['rank'],
                 join_fun=self.arguments['join_fun'],
-                merge_fun=self.arguments['merge_fun'])([x_in, last])
+                merge_fun=self.arguments['merge_fun'])([x, last])
 
             if self.arguments['block_nonlinearity']:
                 last = make_valuefun()(last)
@@ -88,6 +90,11 @@ class CrystalStructureClassification(flowws.Stage):
         x_in = keras.layers.Input(xs[0].shape)
         v_in = keras.layers.Input(ts[0].shape)
 
+        if self.arguments.get('scale_invariant', None):
+            x = NeighborDistanceNormalization(mode=self.arguments['scale_invariant'])(x_in)
+        else:
+            x = x_in
+
         last = keras.layers.Dense(n_dim)(v_in)
         for _ in range(self.arguments['n_blocks']):
             last = make_block(last)
@@ -96,7 +103,7 @@ class CrystalStructureClassification(flowws.Stage):
             make_scorefun(), make_valuefun(), True, name='final_attention',
             rank=self.arguments['rank'], join_fun=self.arguments['join_fun'],
             merge_fun=self.arguments['merge_fun'])(
-            [x_in, last], return_invariants=True, return_attention=True)
+            [x, last], return_invariants=True, return_attention=True)
         last = keras.layers.Dense(dilation_dim, name='final_mlp')(last)
         if self.arguments.get('dropout', 0):
             last = keras.layers.Dropout(self.arguments['dropout'])(last)
