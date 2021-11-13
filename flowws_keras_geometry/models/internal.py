@@ -165,6 +165,13 @@ trivecvec_invariants = vecvec_invariants
 
 trivecvec_covariants = vecvec_covariants
 
+def custom_all(xs):
+    """Reduces the arguments with multiplication. Convenience for broadcasting."""
+    result = True
+    for x in xs:
+        result = tf.math.logical_and(result, x)
+    return result
+
 class GradientLayer(keras.layers.Layer):
     """Calculates the gradient of one input with respect to the other."""
     def call(self, inputs):
@@ -570,12 +577,12 @@ class Vector2VectorAttention(VectorAttention):
             value_mask = parsed_mask.values
             if position_mask is not None:
                 position_mask = tf.expand_dims(position_mask, -1)
-                position_mask = tf.reduce_all([position_mask[idx] for idx in broadcast_indices[:-1]], axis=0)
+                position_mask = custom_all([position_mask[idx] for idx in broadcast_indices[:-1]])
             else:
                 position_mask = True
             if value_mask is not None:
                 value_mask = tf.expand_dims(value_mask, -1)
-                value_mask = tf.reduce_all([value_mask[idx] for idx in broadcast_indices[:-1]], axis=0)
+                value_mask = custom_all([value_mask[idx] for idx in broadcast_indices[:-1]])
             else:
                 value_mask = True
             product_mask = tf.logical_and(position_mask, value_mask)

@@ -29,13 +29,16 @@ class CoarseGrainAttention(Vector2VectorAttention):
 
     def _expand_products(self, positions, values):
         (bcast, invars, covars, vs) = super()._expand_products(positions, values)
+        new_bcast = []
         for idx in bcast:
+            idx = list(idx)
             idx.insert(-1 - self.rank, None)
+            new_bcast.append(idx)
 
         invars = tf.expand_dims(invars, -2 - self.rank)
         covars = tf.expand_dims(covars, -2 - self.rank)
         new_vs = [tf.expand_dims(v, -2 - self.rank) for v in vs]
-        return bcast, invars, covars, new_vs
+        return new_bcast, invars, covars, new_vs
 
     def _intermediates(self, inputs, mask=None):
         (positions, values, child_values) = inputs
