@@ -78,6 +78,8 @@ class GTARDataset:
 
                 vertices = self.handle.getRecord(self.group_records[group], index)
                 vertices = vertices.reshape((-1, 3))
+
+                vertices -= np.mean(vertices, axis=0, keepdims=True)
                 scale = np.mean(np.linalg.norm(vertices, axis=-1))
 
                 vertex_choice = rng.choice(
