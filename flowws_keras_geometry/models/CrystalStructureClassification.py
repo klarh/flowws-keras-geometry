@@ -86,7 +86,14 @@ class CrystalStructureClassification(flowws.Stage):
 
             return last
 
-        (xs, ts) = scope['x_train']
+        if 'x_train' in scope:
+            (xs, ts) = scope['x_train']
+        elif 'train_generator' in scope:
+            sample_batch = next(scope['train_generator'])
+            ((xs, ts), ys) = sample_batch
+        else:
+            raise NotImplementedError()
+
         x_in = keras.layers.Input(xs[0].shape)
         v_in = keras.layers.Input(ts[0].shape)
 

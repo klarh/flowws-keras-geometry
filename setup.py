@@ -38,6 +38,7 @@ for name in module_names:
 subpkg = 'data'
 module_names = [
     'MD17',
+    'ModelNet',
     'PDBCache',
     'PDBCoarseGrained',
     'PyriodicDataset',
