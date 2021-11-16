@@ -111,6 +111,8 @@ class ModelNet(flowws.Stage):
             help='Random seed for dataset generation'),
         Arg('validation_fraction', '-v', float, 0,
             help='Fraction of training data to use for validation set'),
+        Arg('batch_size', '-b', int, 8,
+            help='Size of point cloud batches'),
     ]
 
     def run(self, scope, storage):
@@ -121,11 +123,13 @@ class ModelNet(flowws.Stage):
 
         scope['type_names'] = dataset.labels
         scope['type_name_map'] = dataset.label_map
-        scope['train_generator'] = dataset.train_generator(self.arguments['seed'] + 1)
-        scope['test_generator'] = dataset.test_generator(self.arguments['seed'] + 2)
+        scope['train_generator'] = dataset.train_generator(
+            self.arguments['batch_size'], self.arguments['seed'] + 1)
+        scope['test_generator'] = dataset.test_generator(
+            self.arguments['batch_size'], self.arguments['seed'] + 2)
         if self.arguments['validation_fraction']:
             scope['validation_generator'] = dataset.val_generator(
-                self.arguments['seed'] + 3)
+                self.arguments['batch_size'], self.arguments['seed'] + 3)
         scope['num_classes'] = len(dataset.labels)
 
     @classmethod
