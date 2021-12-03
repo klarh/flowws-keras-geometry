@@ -67,6 +67,10 @@ class MoleculeForceRegression(flowws.Stage):
                   NORMALIZATION_LAYER_DOC)),
         Arg('normalize_distances', None, str,
             help='Method to use to normalize pairwise distances'),
+        Arg('predict_energy', None, bool, False,
+            help='If True, predict energies instead of forces'),
+        Arg('energy_bias', None, bool, False,
+            help='If True, learn a bias term for energy prediction'),
     ]
 
     def run(self, scope, storage):
@@ -166,8 +170,10 @@ class MoleculeForceRegression(flowws.Stage):
         last = keras.layers.Dense(dilation_dim, name='final_mlp')(last)
         last = final_activation_layer()(last)
         last = NeighborhoodReduction()(last)
-        last = keras.layers.Dense(1, name='energy_projection', use_bias=False)(last)
-        last = GradientLayer()((last, x_in))
+        use_bias = self.arguments.get('energy_bias', False)
+        last = keras.layers.Dense(1, name='energy_projection', use_bias=use_bias)(last)
+        if not self.arguments['predict_energy']:
+            last = GradientLayer()((last, x_in))
 
         scope['input_symbol'] = [x_in, v_in]
         scope['output'] = last
