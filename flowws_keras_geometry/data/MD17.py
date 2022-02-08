@@ -177,7 +177,7 @@ class MD17(flowws.Stage):
 
     @staticmethod
     def get_url(name):
-        remap = dict(benzene='benzene_old_dft.npz')
+        remap = dict(benzene='benzene2017_dft.npz')
 
         base = 'http://quantum-machine.org/gdml/data/npz/'
 
