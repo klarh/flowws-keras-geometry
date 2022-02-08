@@ -178,33 +178,57 @@ class GradientLayer(keras.layers.Layer):
         return tf.gradients(inputs[0], inputs[1])
 
 class MomentumNormalization(keras.layers.Layer):
-    """Exponential decay normalization."""
-    def __init__(self, momentum=.99, epsilon=1e-7, *args, **kwargs):
+    """Exponential decay normalization.
+
+    Computes the mean and standard deviation all axes but the last and
+    normalizes values to have mean 0 and variance 1; suitable for
+    normalizing a vector of real-valued quantities with differing
+    units.
+
+    """
+    def __init__(self, momentum=.99, epsilon=1e-7, use_mean=True,
+                 use_std=True, *args, **kwargs):
         self.momentum = momentum
         self.epsilon = epsilon
+        self.use_mean = use_mean
+        self.use_std = use_std
+        self.supports_masking = True
         super().__init__(*args, **kwargs)
 
     def build(self, input_shape):
-        shape = [1]*len(input_shape)
+        shape = [input_shape[-1]]
 
         self.mu = self.add_weight(
             name='mu', shape=shape, initializer='zeros', trainable=False)
         self.sigma = self.add_weight(
             name='sigma', shape=shape, initializer='ones', trainable=False)
 
-    def call(self, inputs, training=False):
+    def call(self, inputs, training=False, mask=None):
         if training:
-            mean = tf.math.reduce_mean(inputs, keepdims=True)
-            std = tf.math.reduce_std(inputs, keepdims=True)
+            axes = range(len(inputs.shape) - 1)
+            if mask is not None:
+                values = tf.ragged.boolean_mask(inputs, mask=mask)
+            else:
+                values = inputs
+            mean = tf.math.reduce_mean(values, axis=axes, keepdims=False)
+            std = tf.math.reduce_std(values, axis=axes, keepdims=False)
             self.mu.assign(self.momentum*self.mu + (1 - self.momentum)*mean)
             self.sigma.assign(self.momentum*self.sigma + (1 - self.momentum)*std)
 
-        return (inputs - self.mu)/(self.sigma + self.epsilon)
+        mu = self.mu*tf.cast(self.use_mean, tf.float32)
+        use_std = tf.cast(self.use_std, tf.float32)
+        denominator = use_std*(self.sigma + self.epsilon) + (1 - use_std)*1.
+        result = (inputs - mu)/denominator
+        if mask is not None:
+            return tf.where(mask, result, inputs)
+        return result
 
     def get_config(self):
         result = super().get_config()
         result['momentum'] = self.momentum
         result['epsilon'] = self.epsilon
+        result['use_mean'] = self.use_mean
+        result['use_std'] = self.use_std
         return result
 
 class NeighborDistanceNormalization(keras.layers.Layer):
