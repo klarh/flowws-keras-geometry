@@ -65,6 +65,9 @@ class MoleculeForceRegression(flowws.Stage):
         Arg('value_normalization', None, [str], [],
             help=('Normalizations to apply to value function' +
                   NORMALIZATION_LAYER_DOC)),
+        Arg('invar_normalization', None, [str], [],
+            help=('Normalizations to apply to invariants in value function' +
+                  NORMALIZATION_LAYER_DOC)),
         Arg('normalize_distances', None, str,
             help='Method to use to normalize pairwise distances'),
         Arg('predict_energy', None, bool, False,
@@ -110,8 +113,12 @@ class MoleculeForceRegression(flowws.Stage):
             layers.append(keras.layers.Dense(1))
             return keras.models.Sequential(layers)
 
-        def make_valuefun():
+        def make_valuefun(uses_invars=False):
             layers = []
+
+            if uses_invars:
+                for name in self.arguments['invar_normalization']:
+                    layers.append(NORMALIZATION_LAYERS[name](rank))
 
             for _ in range(self.arguments['mlp_layers']):
                 layers.append(keras.layers.Dense(dilation_dim))
@@ -130,7 +137,7 @@ class MoleculeForceRegression(flowws.Stage):
         def make_block(last):
             residual_in = last
             last = VectorAttention(
-                make_scorefun(), make_valuefun(), False, rank=rank,
+                make_scorefun(), make_valuefun(True), False, rank=rank,
                 join_fun=self.arguments['join_fun'],
                 merge_fun=self.arguments['merge_fun'])([delta_x, last])
 
@@ -161,7 +168,7 @@ class MoleculeForceRegression(flowws.Stage):
             last = make_block(last)
 
         (last, ivs, att) = VectorAttention(
-            make_scorefun(), make_valuefun(), True, name='final_attention',
+            make_scorefun(), make_valuefun(True), True, name='final_attention',
             rank=rank,
             join_fun=self.arguments['join_fun'],
             merge_fun=self.arguments['merge_fun'])(
