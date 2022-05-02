@@ -179,8 +179,14 @@ class MoleculeForceRegression(flowws.Stage):
         last = NeighborhoodReduction()(last)
         use_bias = self.arguments.get('energy_bias', False)
         last = keras.layers.Dense(1, name='energy_projection', use_bias=use_bias)(last)
+        energy_prediction = last
         if not self.arguments['predict_energy']:
             last = GradientLayer()((last, x_in))
+
+        if scope.get('energy_labels', False):
+            last = (last[0], energy_prediction)
+            kwargs = scope.setdefault('compile_kwargs', {})
+            kwargs['loss_weights'] = (1 - 1e-3, 1e-3)
 
         scope['input_symbol'] = [x_in, v_in]
         scope['output'] = last
