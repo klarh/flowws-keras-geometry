@@ -6,7 +6,7 @@ from flowws import Argument as Arg
 import numpy as np
 from tensorflow import keras
 
-from .internal import IndexedScaledMSE, IndexedScaledMAE, ScaledMSE, ScaledMAE
+from .internal import ScaledMSE, ScaledMAE
 
 @flowws.add_stage_arguments
 class MD17(flowws.Stage):
