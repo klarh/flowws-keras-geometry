@@ -83,8 +83,8 @@ class GTARDataset:
                 scale = np.mean(np.linalg.norm(vertices, axis=-1))
 
                 vertex_choice = rng.choice(
-                    len(vertices), min(len(vertices), self.neighborhood_size),
-                    replace=False)
+                    len(vertices), self.neighborhood_size,
+                    replace=(self.neighborhood_size > len(vertices)))
                 rs[i, :len(vertex_choice)] = vertices[vertex_choice]/scale
                 vs[i, :len(vertex_choice)] = 1
                 ys[i] = y
@@ -132,6 +132,7 @@ class ModelNet(flowws.Stage):
         if self.arguments['validation_fraction']:
             scope['validation_generator'] = dataset.val_generator(
                 self.arguments['batch_size'], self.arguments['seed'] + 3)
+        scope['neighborhood_size'] = self.arguments['neighborhood_size']
         scope['num_classes'] = len(dataset.labels)
 
     @classmethod
