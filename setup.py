@@ -49,6 +49,7 @@ add_subpkg(subpkg, module_names)
 subpkg = 'models'
 module_names = [
     'CrystalStructureClassification',
+    'GalaMoleculeForceRegression',
     'MoleculeForceRegression',
     'PDBInverseCoarseGrain',
     'PDBInverseCoarseGrainTransformer',
