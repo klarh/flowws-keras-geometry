@@ -34,9 +34,12 @@ class RMD17(MD17):
         return os.path.join(self.arguments['cache_dir'], fname)
 
     @staticmethod
-    def get_encoding(data, max_atoms, type_map, indices=None, energy_conversion=1.):
+    def get_encoding(data, max_atoms, type_map, indices=None, energy_conversion=1.,
+                     include_energy=False):
         coords = data['coords']
         forces = data['forces']*energy_conversion
+        # (Nt, 1)
+        energies = data['energies'][..., None]*energy_conversion if include_energy else None
         types = np.zeros(max_atoms, dtype=np.uint32)
         types[:coords.shape[1]] = [type_map[t] for t in data['nuclear_charges']]
 
@@ -52,7 +55,7 @@ class RMD17(MD17):
 
         types_onehot = np.eye(len(type_map))[types]
         types_onehot = np.tile(types_onehot[np.newaxis, ...], (len(coords), 1, 1))
-        return (rs, types_onehot), Fs
+        return (rs, types_onehot), Fs, energies
 
     @staticmethod
     def get_trajectory_size_types(data):
