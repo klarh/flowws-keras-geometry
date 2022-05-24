@@ -29,6 +29,25 @@ NORMALIZATION_LAYER_DOC = ' (any of {})'.format(
     ','.join(map(str, NORMALIZATION_LAYERS))
 )
 
+class NormalizeLayerBy(keras.layers.Layer):
+    def __init__(self, power=1, *args, **kwargs):
+        self.power = power
+        super().__init__(*args, **kwargs)
+
+    def call(self, x):
+        from geometric_algebra_attention.tensorflow.geometric_algebra import custom_norm
+        (left, right) = x
+        norm = custom_norm(right)
+        if self.power != 1:
+            norm = norm**self.power
+        norm = tf.clip_by_value(norm, 1e-7, np.inf)
+        return left/norm
+
+    def get_config(self):
+        result = super().get_config()
+        result['power'] = self.power
+        return result
+
 @flowws.add_stage_arguments
 class GalaMoleculeForceRegression(flowws.Stage):
     """Build a geometric attention network for the molecular force regression task.
@@ -86,6 +105,10 @@ class GalaMoleculeForceRegression(flowws.Stage):
            help='Multivector2MultivectorAttention covariant_mode to use'),
         Arg('use_multivectors', None, bool, False,
             help='If True, use multivector intermediates for calculations'),
+        Arg('include_normalized_products', None, bool, False,
+           help='Also include normalized geometric product terms'),
+        Arg('normalize_equivariant_values', None, bool, False,
+           help='If True, divide equivariant values by magnitude of inputs after each attention step'),
     ]
 
     def run(self, scope, storage):
@@ -179,6 +202,7 @@ class GalaMoleculeForceRegression(flowws.Stage):
                     merge_fun=merge_fun,
                     invariant_mode=invar_mode,
                     covariant_mode=covar_mode,
+                    include_normalized_products=self.arguments['include_normalized_products'],
                 )(arg)
 
             arg = [last_x, last, w_in] if use_weights else [last_x, last]
@@ -191,6 +215,7 @@ class GalaMoleculeForceRegression(flowws.Stage):
                 merge_fun=merge_fun,
                 invariant_mode=invar_mode,
                 covariant_mode=covar_mode,
+                include_normalized_products=self.arguments['include_normalized_products'],
             )(arg)
 
             if block_nonlin:
@@ -203,7 +228,10 @@ class GalaMoleculeForceRegression(flowws.Stage):
                 last = layer(last)
 
             if self.arguments['use_multivectors']:
-                last_x = residual_in_x + last_x
+                if self.arguments['normalize_equivariant_values']:
+                    last_x = NormalizeLayerBy(rank - 1)([last_x, residual_in_x])
+                if residual:
+                    last_x = residual_in_x + last_x
                 for layer in normalization_getter('equivariant_value'):
                     last_x = layer(last_x)
 
