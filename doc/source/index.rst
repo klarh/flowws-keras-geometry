@@ -52,6 +52,8 @@ Data sources
 
 .. autoclass:: MD17
 
+.. autoclass:: ModelNet
+
 .. autoclass:: PDBCache
 
 .. autoclass:: PDBCoarseGrained
@@ -67,9 +69,15 @@ Model Architectures
 
 .. autoclass:: CrystalStructureClassification
 
+.. autoclass:: GalaMoleculeForceRegression
+
+.. autoclass:: GalaPDBInverseCoarseGrain
+
 .. autoclass:: MoleculeForceRegression
 
 .. autoclass:: PDBInverseCoarseGrain
+
+.. autoclass:: PDBInverseCoarseGrainTransformer
 
 Indices and tables
 ==================

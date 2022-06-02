@@ -1,4 +1,5 @@
 flowws
 m2r2
 numpy
+sphinx-rtd-theme
 tensorflow

@@ -7,3 +7,4 @@ GalaPDBInverseCoarseGrain = try_to_import(
     '.GalaPDBInverseCoarseGrain', 'GalaPDBInverseCoarseGrain', __name__)
 from .MoleculeForceRegression import MoleculeForceRegression
 from .PDBInverseCoarseGrain import PDBInverseCoarseGrain
+from .PDBInverseCoarseGrainTransformer import PDBInverseCoarseGrainTransformer
