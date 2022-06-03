@@ -81,6 +81,8 @@ class GalaPDBInverseCoarseGrain(flowws.Stage):
             help='If True, use multivector intermediates for calculations'),
         Arg('include_normalized_products', None, bool, False,
            help='Include normalized geometric products in calculations'),
+        Arg('convex_covariants', None, bool, False,
+            help='Use convex combinations of input points if True'),
     ]
 
     def run(self, scope, storage):
@@ -178,6 +180,7 @@ class GalaPDBInverseCoarseGrain(flowws.Stage):
                     invariant_mode=invar_mode,
                     covariant_mode=covar_mode,
                     include_normalized_products=self.arguments['include_normalized_products'],
+                    convex_covariants=self.arguments['convex_covariants'],
                 )(arg)
 
             arg = [last_x, last, w_in] if use_weights else [last_x, last]
@@ -225,6 +228,7 @@ class GalaPDBInverseCoarseGrain(flowws.Stage):
                 invariant_mode=invar_mode,
                 covariant_mode=covar_mode,
                 include_normalized_products=self.arguments['include_normalized_products'],
+                convex_covariants=self.arguments['convex_covariants'],
             )(arg)
 
             arg = [last_x, last]
@@ -287,6 +291,7 @@ class GalaPDBInverseCoarseGrain(flowws.Stage):
             invariant_mode=invar_mode,
             covariant_mode=covar_mode,
             include_normalized_products=self.arguments['include_normalized_products'],
+            convex_covariants=self.arguments['convex_covariants'],
         )(arg)
 
         last = keras.layers.MultiHeadAttention(8, n_dim)(atom_embedding, last)
