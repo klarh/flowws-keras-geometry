@@ -83,6 +83,8 @@ class GalaPDBInverseCoarseGrain(flowws.Stage):
            help='Include normalized geometric products in calculations'),
         Arg('convex_covariants', None, bool, False,
             help='Use convex combinations of input points if True'),
+        Arg('normalize_equivariant_values', None, bool, False,
+           help='If True, multiply vector values by normalized vectors at each attention step'),
     ]
 
     def run(self, scope, storage):
@@ -136,6 +138,15 @@ class GalaPDBInverseCoarseGrain(flowws.Stage):
 
         dilation_dim = int(np.round(n_dim*dilation))
 
+        def make_layer_inputs(x, v):
+            nonnorm = (x, v, w_in) if use_weights else (x, v)
+            if self.arguments['normalize_equivariant_values']:
+                xnorm = keras.layers.LayerNormalization()(x)
+                norm = (xnorm, v, w_in) if use_weights else (xnorm, v)
+                return [nonnorm] + (rank - 1)*[norm]
+            else:
+                return rank*[nonnorm]
+
         def make_scorefun():
             layers = [keras.layers.Dense(dilation_dim)]
 
@@ -168,7 +179,7 @@ class GalaPDBInverseCoarseGrain(flowws.Stage):
             residual_in_x = last_x
             residual_in = last
             if self.arguments['use_multivectors']:
-                arg = [last_x, last, w_in] if use_weights else [last_x, last]
+                arg = make_layer_inputs(last_x, last)
                 last_x = gala.Multivector2MultivectorAttention(
                     make_scorefun(),
                     make_valuefun(n_dim),
@@ -183,7 +194,7 @@ class GalaPDBInverseCoarseGrain(flowws.Stage):
                     convex_covariants=self.arguments['convex_covariants'],
                 )(arg)
 
-            arg = [last_x, last, w_in] if use_weights else [last_x, last]
+            arg = make_layer_inputs(last_x, last)
             last = Attention(
                 make_scorefun(),
                 make_valuefun(n_dim),
@@ -278,7 +289,7 @@ class GalaPDBInverseCoarseGrain(flowws.Stage):
         atom_embedding = keras.layers.Embedding(
             len(scope['child_type_names']), n_dim, mask_zero=True)(label_in)
 
-        arg = [last_x, last, w_in] if use_weights else [last_x, last]
+        arg = make_layer_inputs(last_x, last)
         arg = [atom_embedding, arg]
         last_x = AttentionLabeled(
             make_scorefun(),

@@ -29,25 +29,6 @@ NORMALIZATION_LAYER_DOC = ' (any of {})'.format(
     ','.join(map(str, NORMALIZATION_LAYERS))
 )
 
-class NormalizeLayerBy(keras.layers.Layer):
-    def __init__(self, power=1, *args, **kwargs):
-        self.power = power
-        super().__init__(*args, **kwargs)
-
-    def call(self, x):
-        from geometric_algebra_attention.tensorflow.geometric_algebra import custom_norm
-        (left, right) = x
-        norm = custom_norm(right)
-        if self.power != 1:
-            norm = norm**self.power
-        norm = tf.clip_by_value(norm, 1e-7, np.inf)
-        return left/norm
-
-    def get_config(self):
-        result = super().get_config()
-        result['power'] = self.power
-        return result
-
 @flowws.add_stage_arguments
 class GalaMoleculeForceRegression(flowws.Stage):
     """Build a geometric attention network for the molecular force regression task.
@@ -108,7 +89,7 @@ class GalaMoleculeForceRegression(flowws.Stage):
         Arg('include_normalized_products', None, bool, False,
            help='Also include normalized geometric product terms'),
         Arg('normalize_equivariant_values', None, bool, False,
-           help='If True, divide equivariant values by magnitude of inputs after each attention step'),
+           help='If True, multiply vector values by normalized vectors at each attention step'),
     ]
 
     def run(self, scope, storage):
@@ -159,6 +140,15 @@ class GalaMoleculeForceRegression(flowws.Stage):
 
         dilation_dim = int(np.round(n_dim*dilation))
 
+        def make_layer_inputs(x, v):
+            nonnorm = (x, v, w_in) if use_weights else (x, v)
+            if self.arguments['normalize_equivariant_values']:
+                xnorm = keras.layers.LayerNormalization()(x)
+                norm = (xnorm, v, w_in) if use_weights else (xnorm, v)
+                return [nonnorm] + (rank - 1)*[norm]
+            else:
+                return rank*[nonnorm]
+
         def make_scorefun():
             layers = [keras.layers.Dense(dilation_dim)]
 
@@ -191,7 +181,7 @@ class GalaMoleculeForceRegression(flowws.Stage):
             residual_in_x = last_x
             residual_in = last
             if self.arguments['use_multivectors']:
-                arg = [last_x, last, w_in] if use_weights else [last_x, last]
+                arg = make_layer_inputs(last_x, last)
                 last_x = gala.Multivector2MultivectorAttention(
                     make_scorefun(),
                     make_valuefun(n_dim),
@@ -205,7 +195,7 @@ class GalaMoleculeForceRegression(flowws.Stage):
                     include_normalized_products=self.arguments['include_normalized_products'],
                 )(arg)
 
-            arg = [last_x, last, w_in] if use_weights else [last_x, last]
+            arg = make_layer_inputs(last_x, last)
             last = Attention(
                 make_scorefun(),
                 make_valuefun(n_dim),
@@ -228,8 +218,6 @@ class GalaMoleculeForceRegression(flowws.Stage):
                 last = layer(last)
 
             if self.arguments['use_multivectors']:
-                if self.arguments['normalize_equivariant_values']:
-                    last_x = NormalizeLayerBy(rank - 1)([last_x, residual_in_x])
                 if residual:
                     last_x = residual_in_x + last_x
                 for layer in normalization_getter('equivariant_value'):
@@ -253,7 +241,7 @@ class GalaMoleculeForceRegression(flowws.Stage):
         for _ in range(num_blocks):
             last_x, last = make_block(last_x, last)
 
-        arg = [last_x, last, w_in] if use_weights else [last_x, last]
+        arg = make_layer_inputs(last_x, last)
         (last, ivs, att) = Attention(
             make_scorefun(),
             make_valuefun(n_dim),
