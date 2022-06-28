@@ -4,9 +4,6 @@ import subprocess
 import flowws
 from flowws import Argument as Arg
 import numpy as np
-from tensorflow import keras
-
-from .internal import ScaledMSE, ScaledMAE
 
 @flowws.add_stage_arguments
 class MD17(flowws.Stage):
@@ -43,6 +40,8 @@ class MD17(flowws.Stage):
             ' (negative to auto-scale from training data)'),
         Arg('energy_labels', '-e', bool, False,
             help='If True, include energies as labels'),
+        Arg('no_keras', '-k', bool, False,
+            help='If True, don\'t load/import keras'),
     ]
 
     def run(self, scope, storage):
@@ -124,8 +123,11 @@ class MD17(flowws.Stage):
         for dset in datasets.values():
             dset[2] /= yscale
 
-        scaled_mse = ScaledMSE(yscale)
-        scaled_mae = ScaledMAE(yscale)
+        if not self.arguments['no_keras']:
+            from .internal import ScaledMSE, ScaledMAE
+            scaled_mse = ScaledMSE(yscale)
+            scaled_mae = ScaledMAE(yscale)
+            scope.setdefault('metrics', []).extend([scaled_mse, scaled_mae])
 
         if self.arguments['energy_labels']:
             Uscale = np.std(datasets['train'][3])*self.arguments['y_scale_reduction']
@@ -165,7 +167,6 @@ class MD17(flowws.Stage):
         scope['validation_data'] = (datasets['val'][0], datasets['val'][1])
         scope['type_map'] = type_map
         scope['energy_labels'] = self.arguments['energy_labels']
-        scope.setdefault('metrics', []).extend([scaled_mse, scaled_mae])
 
     def _download(self, name):
         url = self.get_url(name)
