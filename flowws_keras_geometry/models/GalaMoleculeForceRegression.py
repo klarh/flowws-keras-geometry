@@ -90,6 +90,8 @@ class GalaMoleculeForceRegression(flowws.Stage):
            help='Also include normalized geometric product terms'),
         Arg('normalize_equivariant_values', None, bool, False,
            help='If True, multiply vector values by normalized vectors at each attention step'),
+        Arg('center_of_mass', None, bool, False,
+            help='If True, use coordinates relative to the molecular center of mass'),
     ]
 
     def run(self, scope, storage):
@@ -233,8 +235,15 @@ class GalaMoleculeForceRegression(flowws.Stage):
             w_in = keras.layers.Input((None,), name='wij')
             inputs = [x_in, v_in, w_in]
 
-        delta_x = PairwiseVectorDifference()(x_in)
-        delta_v = PairwiseVectorDifferenceSum()(v_in)
+        if self.arguments['center_of_mass']:
+            mask = tf.math.reduce_any(v_in != 0, axis=-1)
+            sum_part = NeighborhoodReduction()(x_in, mask=mask)
+            count = tf.math.reduce_sum(tf.cast(mask, 'float32'), axis=-1, keepdims=True)
+            delta_x = x_in - (sum_part/count[..., None])[..., None, :]
+            delta_v = v_in
+        else:
+            delta_x = PairwiseVectorDifference()(x_in)
+            delta_v = PairwiseVectorDifferenceSum()(v_in)
 
         last_x = maybe_upcast_vector(delta_x)
         last = keras.layers.Dense(n_dim)(delta_v)
@@ -256,7 +265,8 @@ class GalaMoleculeForceRegression(flowws.Stage):
 
         last = keras.layers.Dense(dilation_dim, name='final_mlp')(last)
         last = final_activation_layer()(last)
-        last = NeighborhoodReduction()(last)
+        if not self.arguments['center_of_mass']:
+            last = NeighborhoodReduction()(last)
         last = keras.layers.Dense(1, name='energy_projection', use_bias=False)(last)
         last = GradientLayer()((last, x_in))
 
