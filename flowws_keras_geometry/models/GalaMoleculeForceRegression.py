@@ -1,3 +1,6 @@
+
+import collections
+
 from .internal import GradientLayer, \
     NeighborhoodReduction, \
     PairwiseValueNormalization, PairwiseVectorDifference, \
@@ -92,6 +95,8 @@ class GalaMoleculeForceRegression(flowws.Stage):
            help='If True, multiply vector values by normalized vectors at each attention step'),
         Arg('center_of_mass', None, bool, False,
             help='If True, use coordinates relative to the molecular center of mass'),
+        Arg('reuse_block_layers', None, bool, False,
+            help='If True, use the same weights for all block-level attention layers'),
     ]
 
     def run(self, scope, storage):
@@ -113,6 +118,30 @@ class GalaMoleculeForceRegression(flowws.Stage):
 
         normalization_getter = lambda key: (
             NORMALIZATION_LAYERS[self.arguments.get(key + '_normalization', None)](rank)
+        )
+
+        equivariant_layer_builder = lambda: gala.Multivector2MultivectorAttention(
+            make_scorefun(),
+            make_valuefun(n_dim),
+            make_valuefun(1),
+            False,
+            rank=rank,
+            join_fun=join_fun,
+            merge_fun=merge_fun,
+            invariant_mode=invar_mode,
+            covariant_mode=covar_mode,
+            include_normalized_products=self.arguments['include_normalized_products'],
+        )
+        invariant_layer_builder = lambda: Attention(
+            make_scorefun(),
+            make_valuefun(n_dim),
+            False,
+            rank=rank,
+            join_fun=join_fun,
+            merge_fun=merge_fun,
+            invariant_mode=invar_mode,
+            covariant_mode=covar_mode,
+            include_normalized_products=self.arguments['include_normalized_products'],
         )
 
         if self.arguments['use_multivectors']:
@@ -179,36 +208,24 @@ class GalaMoleculeForceRegression(flowws.Stage):
             layers.append(keras.layers.Dense(dim))
             return keras.models.Sequential(layers)
 
-        def make_block(last_x, last):
+        if self.arguments['reuse_block_layers']:
+            the_equivariant_layer = equivariant_layer_builder()
+            equivariant_getter = collections.defaultdict(lambda: the_equivariant_layer)
+            the_invariant_layer = invariant_layer_builder()
+            invariant_getter = collections.defaultdict(lambda: the_invariant_layer)
+        else:
+            equivariant_getter = collections.defaultdict(equivariant_layer_builder)
+            invariant_getter = collections.defaultdict(invariant_layer_builder)
+
+        def make_block(i, last_x, last):
             residual_in_x = last_x
             residual_in = last
             if self.arguments['use_multivectors']:
                 arg = make_layer_inputs(last_x, last)
-                last_x = gala.Multivector2MultivectorAttention(
-                    make_scorefun(),
-                    make_valuefun(n_dim),
-                    make_valuefun(1),
-                    False,
-                    rank=rank,
-                    join_fun=join_fun,
-                    merge_fun=merge_fun,
-                    invariant_mode=invar_mode,
-                    covariant_mode=covar_mode,
-                    include_normalized_products=self.arguments['include_normalized_products'],
-                )(arg)
+                last_x = equivariant_getter[i](arg)
 
             arg = make_layer_inputs(last_x, last)
-            last = Attention(
-                make_scorefun(),
-                make_valuefun(n_dim),
-                False,
-                rank=rank,
-                join_fun=join_fun,
-                merge_fun=merge_fun,
-                invariant_mode=invar_mode,
-                covariant_mode=covar_mode,
-                include_normalized_products=self.arguments['include_normalized_products'],
-            )(arg)
+            last = invariant_getter[i](arg)
 
             if block_nonlin:
                 last = make_valuefun(n_dim, in_network=False)(last)
@@ -247,8 +264,8 @@ class GalaMoleculeForceRegression(flowws.Stage):
 
         last_x = maybe_upcast_vector(delta_x)
         last = keras.layers.Dense(n_dim)(delta_v)
-        for _ in range(num_blocks):
-            last_x, last = make_block(last_x, last)
+        for i in range(num_blocks):
+            last_x, last = make_block(i, last_x, last)
 
         arg = make_layer_inputs(last_x, last)
         (last, ivs, att) = Attention(
