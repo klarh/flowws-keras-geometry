@@ -101,6 +101,8 @@ class GalaMoleculeForceRegression(flowws.Stage):
             help='If True, use the same weights for all block-level attention layers'),
         Arg('normalization_kwargs', None, [(str, eval)], [],
             help='Keyword arguments to pass to normalization functions'),
+        Arg('convex_covariants', None, bool, False,
+            help='If True, use convex combinations of covariant values'),
     ]
 
     def run(self, scope, storage):
@@ -137,6 +139,7 @@ class GalaMoleculeForceRegression(flowws.Stage):
             invariant_mode=invar_mode,
             covariant_mode=covar_mode,
             include_normalized_products=self.arguments['include_normalized_products'],
+            convex_covariants=self.arguments['convex_covariants'],
         )
         invariant_layer_builder = lambda: Attention(
             make_scorefun(),
