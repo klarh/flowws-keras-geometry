@@ -20,12 +20,14 @@ LAMBDA_ACTIVATIONS = {
 }
 
 NORMALIZATION_LAYERS = {
-    None: lambda _: [],
-    'none': lambda _: [],
-    'batch': lambda _: [keras.layers.BatchNormalization()],
-    'layer': lambda _: [keras.layers.LayerNormalization()],
-    'momentum': lambda _: [gala.MomentumNormalization()],
-    'momentum_layer': lambda _: [gala.MomentumLayerNormalization()],
+    None: lambda _, **kwargs: [],
+    'none': lambda _, **kwargs: [],
+    'batch': lambda _, **kwargs: [keras.layers.BatchNormalization()],
+    'layer': lambda _, **kwargs: [keras.layers.LayerNormalization()],
+    'momentum': lambda _, **kwargs: [gala.MomentumNormalization(
+        momentum=kwargs.get('momentum', .99))],
+    'momentum_layer': lambda _, **kwargs: [gala.MomentumLayerNormalization(
+        momentum=kwargs.get('momentum', .99))],
 }
 
 NORMALIZATION_LAYER_DOC = ' (any of {})'.format(
@@ -97,6 +99,8 @@ class GalaMoleculeForceRegression(flowws.Stage):
             help='If True, use coordinates relative to the molecular center of mass'),
         Arg('reuse_block_layers', None, bool, False,
             help='If True, use the same weights for all block-level attention layers'),
+        Arg('normalization_kwargs', None, [(str, eval)], [],
+            help='Keyword arguments to pass to normalization functions'),
     ]
 
     def run(self, scope, storage):
@@ -116,8 +120,10 @@ class GalaMoleculeForceRegression(flowws.Stage):
         covar_mode = self.arguments['covariant_mode']
         DropoutLayer = scope.get('dropout_class', keras.layers.Dropout)
 
+        normalization_kwargs = dict(self.arguments.get('normalization_kwargs', []))
         normalization_getter = lambda key: (
-            NORMALIZATION_LAYERS[self.arguments.get(key + '_normalization', None)](rank)
+            NORMALIZATION_LAYERS[self.arguments.get(key + '_normalization', None)](
+                rank, **normalization_kwargs)
         )
 
         equivariant_layer_builder = lambda: gala.Multivector2MultivectorAttention(
