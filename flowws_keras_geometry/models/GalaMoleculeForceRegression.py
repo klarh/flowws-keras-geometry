@@ -287,6 +287,7 @@ class GalaMoleculeForceRegression(flowws.Stage):
             merge_fun=merge_fun,
             invariant_mode=invar_mode,
             covariant_mode=covar_mode,
+            include_normalized_products=self.arguments['include_normalized_products'],
         )(arg, return_invariants=True, return_attention=True)
 
         last = keras.layers.Dense(dilation_dim, name='final_mlp')(last)
