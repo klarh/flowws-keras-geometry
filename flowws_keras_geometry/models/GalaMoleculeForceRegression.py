@@ -103,6 +103,8 @@ class GalaMoleculeForceRegression(flowws.Stage):
             help='Keyword arguments to pass to normalization functions'),
         Arg('convex_covariants', None, bool, False,
             help='If True, use convex combinations of covariant values'),
+        Arg('tied_attention', None, bool, False,
+            help='Use tied attention for rotation-equivariant and -invariant signals'),
     ]
 
     def run(self, scope, storage):
@@ -128,19 +130,34 @@ class GalaMoleculeForceRegression(flowws.Stage):
                 rank, **normalization_kwargs)
         )
 
-        equivariant_layer_builder = lambda: gala.Multivector2MultivectorAttention(
-            make_scorefun(),
-            make_valuefun(n_dim),
-            make_valuefun(1),
-            False,
-            rank=rank,
-            join_fun=join_fun,
-            merge_fun=merge_fun,
-            invariant_mode=invar_mode,
-            covariant_mode=covar_mode,
-            include_normalized_products=self.arguments['include_normalized_products'],
-            convex_covariants=self.arguments['convex_covariants'],
-        )
+        if self.arguments['tied_attention']:
+            equivariant_layer_builder = lambda: gala.TiedMultivectorAttention(
+                make_scorefun(),
+                make_valuefun(n_dim),
+                make_valuefun(1),
+                False,
+                rank=rank,
+                join_fun=join_fun,
+                merge_fun=merge_fun,
+                invariant_mode=invar_mode,
+                covariant_mode=covar_mode,
+                include_normalized_products=self.arguments['include_normalized_products'],
+                convex_covariants=self.arguments['convex_covariants'],
+            )
+        else:
+            equivariant_layer_builder = lambda: gala.Multivector2MultivectorAttention(
+                make_scorefun(),
+                make_valuefun(n_dim),
+                make_valuefun(1),
+                False,
+                rank=rank,
+                join_fun=join_fun,
+                merge_fun=merge_fun,
+                invariant_mode=invar_mode,
+                covariant_mode=covar_mode,
+                include_normalized_products=self.arguments['include_normalized_products'],
+                convex_covariants=self.arguments['convex_covariants'],
+            )
         invariant_layer_builder = lambda: Attention(
             make_scorefun(),
             make_valuefun(n_dim),
@@ -229,12 +246,16 @@ class GalaMoleculeForceRegression(flowws.Stage):
         def make_block(i, last_x, last):
             residual_in_x = last_x
             residual_in = last
-            if self.arguments['use_multivectors']:
+            if self.arguments['tied_attention']:
                 arg = make_layer_inputs(last_x, last)
-                last_x = equivariant_getter[i](arg)
+                (last_x, last) = equivariant_getter[i](arg)
+            else:
+                if self.arguments['use_multivectors']:
+                    arg = make_layer_inputs(last_x, last)
+                    last_x = equivariant_getter[i](arg)
 
-            arg = make_layer_inputs(last_x, last)
-            last = invariant_getter[i](arg)
+                arg = make_layer_inputs(last_x, last)
+                last = invariant_getter[i](arg)
 
             if block_nonlin:
                 last = make_valuefun(n_dim, in_network=False)(last)
