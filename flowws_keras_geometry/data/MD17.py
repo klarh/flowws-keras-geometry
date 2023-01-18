@@ -160,6 +160,8 @@ class MD17(flowws.Stage):
         scope['x_scale'] = xscale
         scope['neighborhood_size'] = max_atoms
         scope['num_types'] = num_types
+        scope['max_types'] = num_types
+        scope['per_molecule'] = True
         scope['x_train'] = datasets['train'][0]
         scope['y_train'] = datasets['train'][1]
         scope['x_test'] = datasets['test'][0]
