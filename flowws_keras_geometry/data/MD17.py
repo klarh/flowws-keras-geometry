@@ -42,6 +42,8 @@ class MD17(flowws.Stage):
             help='If True, include energies as labels'),
         Arg('no_keras', '-k', bool, False,
             help='If True, don\'t load/import keras'),
+        Arg('normalize_on_energy', None, bool, False,
+            help='If True, normalize energies to have variance of 1 instead of forces'),
     ]
 
     def run(self, scope, storage):
@@ -120,19 +122,20 @@ class MD17(flowws.Stage):
             datasets[name] = dset
 
         yscale = np.std(datasets['train'][2])*self.arguments['y_scale_reduction']
+        if self.arguments['energy_labels']:
+            if self.arguments['normalize_on_energy']:
+                yscale = np.std(datasets['train'][3])*self.arguments['y_scale_reduction']
+            for dset in datasets.values():
+                dset[3] /= yscale
         for dset in datasets.values():
             dset[2] /= yscale
 
         if not self.arguments['no_keras']:
             from .internal import ScaledMSE, ScaledMAE
-            scaled_mse = ScaledMSE(yscale)
-            scaled_mae = ScaledMAE(yscale)
-            scope.setdefault('metrics', []).extend([scaled_mse, scaled_mae])
-
-        if self.arguments['energy_labels']:
-            Uscale = np.std(datasets['train'][3])*self.arguments['y_scale_reduction']
-            for dset in datasets.values():
-                dset[3] /= Uscale
+            metrics = scope.setdefault('metrics', [])
+            scaled_mse = ScaledMSE(yscale, name='scaled_mse')
+            scaled_mae = ScaledMAE(yscale, name='scaled_mae')
+            metrics.extend([scaled_mse, scaled_mae])
 
         xscale = 1.
         if 'x_scale_reduction' in self.arguments:
