@@ -37,6 +37,8 @@ for name in module_names:
 
 subpkg = 'data'
 module_names = [
+    'ImportMatProjChargeDensity',
+    'MatProjChargeDensity',
     'MD17',
     'ModelNet',
     'PDBCache',
@@ -60,6 +62,7 @@ add_subpkg(subpkg, module_names)
 subpkg = 'viz'
 module_names = [
     'BackmapCoarseGrainViewer',
+    'MatProjChargeDensityViewer',
     'MoleculeAttentionViewer',
     'ParticleAttentionViewer',
 ]
