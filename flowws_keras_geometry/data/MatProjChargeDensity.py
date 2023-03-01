@@ -153,16 +153,21 @@ class MatProjChargeDensity(flowws.Stage):
                     record.grid, record.box_matrix, record.positions)
                 boxarr = [box.Lx, box.Ly, box.Lz, box.xy, box.xz, box.yz]
                 struc = pyriodic.Structure(positions, record.types, boxarr)
-                struc = struc.replicate_upto(64)
+                Nrep = 64//2
+                nlist = []
 
-                coord_idx = rng.permutation(len(record.point_density))
-                coord_idx = coord_idx[:samples_per_system]
-                selected_density = record.point_density[coord_idx]/density_scale
-                selected_coords = coords[coord_idx]
+                while len(nlist) < samples_per_system*num_neighbors:
+                    Nrep *= 2
+                    struc = struc.replicate_upto(Nrep)
 
-                aabb = freud.locality.AABBQuery(struc.box, struc.positions)
-                nq = aabb.query(selected_coords, query_args)
-                nlist = nq.toNeighborList()
+                    coord_idx = rng.permutation(len(record.point_density))
+                    coord_idx = coord_idx[:samples_per_system]
+                    selected_density = record.point_density[coord_idx]/density_scale
+                    selected_coords = coords[coord_idx]
+
+                    aabb = freud.locality.AABBQuery(struc.box, struc.positions)
+                    nq = aabb.query(selected_coords, query_args)
+                    nlist = nq.toNeighborList()
 
                 ri = selected_coords[nlist.query_point_indices]
                 rj = struc.positions[nlist.point_indices]
@@ -179,9 +184,6 @@ class MatProjChargeDensity(flowws.Stage):
                     (samples_per_system, 1))
 
                 yield rij, tj, selected_density
-
-                # for (rij_, tj_, density_) in zip(rij, tj, selected_density):
-                #     yield rij_, tj_, density_
 
     @staticmethod
     def read_gtar_entry(traj, group):
