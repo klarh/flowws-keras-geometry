@@ -24,7 +24,8 @@ def _fix_box(box_matrix, dtype=np.float32):
     R = R.astype(dtype)
     dimensions = 3
 
-    if not np.allclose(Q[:dimensions, :dimensions], np.eye(dimensions)):
+    if (not np.allclose(Q[:dimensions, :dimensions], np.eye(dimensions)) or
+        np.any(np.diag(R) < 0)):
         # Since we'll be performing a quaternion operation,
         # we have to ensure that Q is a pure rotation
         sign = np.linalg.det(Q)
