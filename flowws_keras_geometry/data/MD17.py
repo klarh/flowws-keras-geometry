@@ -197,6 +197,7 @@ class MD17(flowws.Stage):
         if indices is not None:
             coords = coords[indices]
             forces = forces[indices]
+            energies = energies[indices] if energies is not None else None
 
         rs = np.zeros((len(coords), max_atoms, 3))
         rs[:, :coords.shape[1], :] = coords
