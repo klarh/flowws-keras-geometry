@@ -1,5 +1,7 @@
-from . import algebra
+from flowws import try_to_import
+
+algebra = try_to_import('.', 'algebra', __name__)
 from . import data
-from . import layers
-from . import models
+layers = try_to_import('.', 'layers', __name__)
+models = try_to_import('.', 'models', __name__)
 from . import viz
