@@ -33,7 +33,7 @@ class RMD17(MD17):
 
     @staticmethod
     def get_encoding(data, max_atoms, type_map, indices=None, energy_conversion=1.,
-                     include_energy=False):
+                     include_energy=False, use_float=False):
         coords = data['coords']
         forces = data['forces']*energy_conversion
         # (Nt, 1)
@@ -54,6 +54,12 @@ class RMD17(MD17):
 
         types_onehot = np.eye(len(type_map))[types]
         types_onehot = np.tile(types_onehot[np.newaxis, ...], (len(coords), 1, 1))
+
+        if use_float:
+            rs = rs.astype(np.float32)
+            types_onehot = types_onehot.astype(np.float32)
+            Fs = Fs.astype(np.float32)
+            energies = energies.astype(np.float32) if energies is not None else None
         return (rs, types_onehot), Fs, energies
 
     @staticmethod

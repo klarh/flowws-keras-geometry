@@ -44,6 +44,10 @@ class MD17(flowws.Stage):
             help='If True, don\'t load/import keras'),
         Arg('normalize_on_energy', None, bool, False,
             help='If True, normalize energies to have variance of 1 instead of forces'),
+        Arg('use_float', None, bool,
+            help='If True, convert loaded values to floating point'),
+        Arg('force_labels', '-f', bool, True,
+            help='If True, include forces as labels'),
     ]
 
     def run(self, scope, storage):
@@ -91,7 +95,8 @@ class MD17(flowws.Stage):
                 indices = locals()['{}_indices'.format(name)]
                 encoding = self.get_encoding(
                     loaded_files[fname], max_atoms, type_map, indices[fname],
-                    energy_conversion, self.arguments['energy_labels'])
+                    energy_conversion, self.arguments['energy_labels'],
+                    self.arguments.get('use_float', None))
                 (xs, ts), Fs, Us = encoding
                 dset_xs.append(xs)
                 dset_ts.append(ts)
@@ -155,9 +160,14 @@ class MD17(flowws.Stage):
 
         for (name, dset) in list(datasets.items()):
             if self.arguments['energy_labels']:
-                datasets[name] = tuple(dset[:2]), tuple(dset[2:])
-            else:
+                if self.arguments['force_labels']:
+                    datasets[name] = tuple(dset[:2]), tuple(dset[2:])
+                else:
+                    datasets[name] = tuple(dset[:2]), dset[3]
+            elif self.arguments['force_labels']:
                 datasets[name] = tuple(dset[:2]), dset[2]
+            else:
+                raise ValueError()
 
         scope['y_scale'] = yscale
         scope['x_scale'] = xscale
@@ -185,7 +195,7 @@ class MD17(flowws.Stage):
 
     @staticmethod
     def get_encoding(data, max_atoms, type_map, indices=None, energy_conversion=1.,
-                     include_energy=False):
+                     include_energy=False, use_float=False):
         coords = data['R']
         # (Nt, Natom, 3)
         forces = data['F']*energy_conversion
@@ -207,6 +217,12 @@ class MD17(flowws.Stage):
 
         types_onehot = np.eye(len(type_map))[types]
         types_onehot = np.tile(types_onehot[np.newaxis, ...], (len(coords), 1, 1))
+
+        if use_float:
+            rs = rs.astype(np.float32)
+            types_onehot = types_onehot.astype(np.float32)
+            Fs = Fs.astype(np.float32)
+            energies = energies.astype(np.float32) if energies is not None else None
         return (rs, types_onehot), Fs, energies
 
     @staticmethod
